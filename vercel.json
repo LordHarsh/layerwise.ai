@@ -3,7 +3,6 @@
   "buildCommand": "pnpm build",
   "installCommand": "pnpm install",
   "framework": "nextjs",
-  "ignoreCommand": "exit 0",
   "functions": {
     "api/index.py": {
       "runtime": "@vercel/python@4.3.1",
