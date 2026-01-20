@@ -9,7 +9,7 @@
       "maxDuration": 60,
       "memory": 512,
       "includeFiles": "api/**/*.py",
-      "excludeFiles": "api/{venv,__pycache__}/**"
+      "excludeFiles": "{node_modules,api/venv,**/__pycache__,*.pyc,*.pyo,.git,.next,out,build,coverage,.vercel,resources,tests}/**"
     }
   },
   "rewrites": [
