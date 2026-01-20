@@ -59,8 +59,8 @@ export function useTakeoffStream(options: UseTakeoffStreamOptions = {}) {
       });
 
       try {
-        // Use /py-api in production (rewrites to Python serverless), /takeoff in local dev
-        const endpoint = apiUrl ? `${apiUrl}/takeoff/stream` : "/py-api/takeoff/stream";
+        // Use /api/index (Python serverless) in production, /takeoff in local dev
+        const endpoint = apiUrl ? `${apiUrl}/takeoff/stream` : "/api/index/takeoff/stream";
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
