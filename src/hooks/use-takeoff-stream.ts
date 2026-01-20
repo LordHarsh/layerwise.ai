@@ -22,8 +22,12 @@ interface UseTakeoffStreamOptions {
 }
 
 export function useTakeoffStream(options: UseTakeoffStreamOptions = {}) {
-  const { apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000" } =
-    options;
+  // In production, use /py-api which rewrites to the Python serverless function
+  // In development, use localhost:8000 for the local FastAPI server
+  const defaultApiUrl = typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:8000"
+    : "";
+  const { apiUrl = process.env.NEXT_PUBLIC_API_URL || defaultApiUrl } = options;
 
   const [state, setState] = useState<TakeoffStreamState>({
     status: "idle",
@@ -55,7 +59,9 @@ export function useTakeoffStream(options: UseTakeoffStreamOptions = {}) {
       });
 
       try {
-        const response = await fetch(`${apiUrl}/api/takeoff/stream`, {
+        // Use /py-api in production (rewrites to Python serverless), /api in local dev
+        const endpoint = apiUrl ? `${apiUrl}/api/takeoff/stream` : "/py-api/takeoff/stream";
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
