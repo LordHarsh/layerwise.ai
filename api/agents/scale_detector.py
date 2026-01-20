@@ -19,7 +19,7 @@ class ScaleDetectorDeps:
 
 
 scale_detector_agent = Agent(
-    "anthropic:claude-sonnet-4-0",
+    "google-gla:gemini-2.0-flash",
     deps_type=ScaleDetectorDeps,
     output_type=ScaleDetectionResult,
     instructions="""You are an expert at reading architectural drawings and identifying scale notations.

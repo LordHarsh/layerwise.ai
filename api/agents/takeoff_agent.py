@@ -14,7 +14,7 @@ class TakeoffDeps:
 
 
 takeoff_agent = Agent(
-    "anthropic:claude-sonnet-4-0",
+    "google-gla:gemini-2.0-flash",
     deps_type=TakeoffDeps,
     output_type=TakeoffResult,
     instructions="""You are an expert construction estimator analyzing architectural blueprints.

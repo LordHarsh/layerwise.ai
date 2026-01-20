@@ -1,7 +1,9 @@
+import io
 from typing import TypedDict
 
 import httpx
-import fitz  # PyMuPDF
+import pypdfium2 as pdfium
+from PIL import Image
 
 # Standard PDF resolution (points per inch)
 DEFAULT_PDF_DPI = 72
@@ -39,25 +41,28 @@ class PDFService:
         images = []
 
         # Open PDF from bytes
-        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        pdf = pdfium.PdfDocument(pdf_bytes)
 
         try:
-            for page_num in range(len(pdf_document)):
-                page = pdf_document[page_num]
+            # Calculate scale factor for desired DPI
+            scale = dpi / DEFAULT_PDF_DPI
 
-                # Calculate zoom factor for desired DPI
-                zoom = dpi / DEFAULT_PDF_DPI
-                matrix = fitz.Matrix(zoom, zoom)
+            for page_index in range(len(pdf)):
+                page = pdf[page_index]
 
-                # Render page to pixmap
-                pixmap = page.get_pixmap(matrix=matrix)
+                # Render page to bitmap
+                bitmap = page.render(scale=scale)
+
+                # Convert to PIL Image
+                pil_image = bitmap.to_pil()
 
                 # Convert to PNG bytes
-                png_bytes = pixmap.tobytes("png")
-                images.append(png_bytes)
+                buffer = io.BytesIO()
+                pil_image.save(buffer, format="PNG")
+                images.append(buffer.getvalue())
 
         finally:
-            pdf_document.close()
+            pdf.close()
 
         return images
 
@@ -68,17 +73,16 @@ class PDFService:
         Returns:
             PDFInfo with page_count, width, height of first page
         """
-        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        pdf = pdfium.PdfDocument(pdf_bytes)
 
         try:
-            page_count = len(pdf_document)
+            page_count = len(pdf)
 
             # Get dimensions of first page
             if page_count > 0:
-                first_page = pdf_document[0]
-                rect = first_page.rect
-                width = int(rect.width)
-                height = int(rect.height)
+                first_page = pdf[0]
+                width = int(first_page.get_width())
+                height = int(first_page.get_height())
             else:
                 width = height = 0
 
@@ -89,7 +93,7 @@ class PDFService:
             }
 
         finally:
-            pdf_document.close()
+            pdf.close()
 
     @staticmethod
     def is_pdf(data: bytes) -> bool:

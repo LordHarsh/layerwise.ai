@@ -1,0 +1,20 @@
+# Ignore Python virtual environment
+api/venv/
+api/__pycache__/
+**/__pycache__/
+*.pyc
+
+# Ignore local env files
+.env
+.env.local
+api/.env
+
+# Ignore resources docs (not needed in deployment)
+resources/
+
+# Ignore git
+.git/
+
+# Ignore IDE files
+.vscode/
+.idea/

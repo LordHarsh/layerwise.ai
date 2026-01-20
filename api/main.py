@@ -26,8 +26,8 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Layerwise API...")
 
     # Verify required environment variables
-    if not os.getenv("ANTHROPIC_API_KEY") and not os.getenv("OPENAI_API_KEY"):
-        logger.warning("No AI API key found. Set ANTHROPIC_API_KEY or OPENAI_API_KEY")
+    if not os.getenv("GOOGLE_API_KEY"):
+        logger.warning("No AI API key found. Set GOOGLE_API_KEY")
 
     yield
 
@@ -75,9 +75,7 @@ async def health_check():
     """Health check endpoint."""
     return {
         "status": "healthy",
-        "ai_configured": bool(
-            os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY")
-        ),
+        "ai_configured": bool(os.getenv("GOOGLE_API_KEY")),
     }
 
 

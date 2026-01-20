@@ -1,0 +1,20 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install",
+  "framework": "nextjs",
+  "ignoreCommand": "exit 0",
+  "functions": {
+    "api/index.py": {
+      "runtime": "@vercel/python@4.3.1",
+      "maxDuration": 60,
+      "memory": 512
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/py-api/:path*",
+      "destination": "/api/index/:path*"
+    }
+  ]
+}
