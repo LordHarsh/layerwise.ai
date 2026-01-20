@@ -57,7 +57,9 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(takeoffs_router, prefix="/api")
+# On Vercel, requests come via /api/index/* rewrite, so no prefix needed
+# Locally, we access directly at /takeoff/*
+app.include_router(takeoffs_router)
 
 
 @app.get("/")
@@ -87,7 +89,7 @@ if __name__ == "__main__":
     debug = os.getenv("DEBUG", "false").lower() == "true"
 
     uvicorn.run(
-        "api.main:app",
+        "api._main:app",
         host=host,
         port=port,
         reload=debug,
