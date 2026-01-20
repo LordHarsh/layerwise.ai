@@ -1,11 +1,9 @@
 # Slim dependencies for Vercel serverless (250MB limit)
 fastapi>=0.115.0
 pydantic>=2.0.0
-pydantic-ai-slim[google]
+# Use OpenAI SDK (lighter) with Gemini's OpenAI-compatible endpoint
+pydantic-ai-slim[openai]
 python-multipart
 sse-starlette
 httpx
 python-dotenv
-# Lightweight PDF library (no external deps)
-pypdfium2
-pillow

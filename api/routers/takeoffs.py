@@ -7,7 +7,7 @@ from pydantic_ai.messages import BinaryContent
 
 from api.models import TakeoffRequest, TakeoffResult
 from api.agents import takeoff_agent, TakeoffDeps, detect_scale
-from api.services import PDFService, StreamService
+from api.services import FileService, StreamService
 
 logger = logging.getLogger(__name__)
 
@@ -21,37 +21,30 @@ async def analyze_blueprint(request: TakeoffRequest) -> TakeoffResult:
     This is the non-streaming version that returns the complete result.
     """
     try:
-        # Fetch the blueprint
-        pdf_bytes = await PDFService.fetch_pdf(request.blueprint_url)
-
-        # Convert to images
-        if PDFService.is_pdf(pdf_bytes):
-            images = PDFService.pdf_to_images(pdf_bytes)
-        else:
-            # Assume it's already an image
-            images = [pdf_bytes]
+        # Fetch the blueprint file
+        file_bytes = await FileService.fetch_file(request.blueprint_url)
+        mime_type = FileService.get_mime_type(file_bytes)
 
         # Determine scale
         scale = request.scale
-        if not scale and request.auto_detect_scale and images:
-            scale_result = await detect_scale(images[0])
+        if not scale and request.auto_detect_scale:
+            scale_result = await detect_scale(file_bytes)
             if scale_result.detected and scale_result.scale_info:
                 scale = scale_result.scale_info.scale_string
 
         # Create dependencies
         deps = TakeoffDeps(
             project_id="temp",
-            blueprint_images=images,
+            blueprint_data=file_bytes,
             scale=scale,
             focus_areas=request.focus_areas,
         )
 
-        # Build the message with images
-        messages = ["Analyze this blueprint and perform a complete quantity takeoff."]
-        for i, img in enumerate(images):
-            messages.append(BinaryContent(data=img, media_type="image/png"))
-            if len(images) > 1:
-                messages.append(f"(Page {i + 1} of {len(images)})")
+        # Build the message with file (Gemini handles PDF/images directly)
+        messages = [
+            "Analyze this blueprint and perform a complete quantity takeoff.",
+            BinaryContent(data=file_bytes, media_type=mime_type),
+        ]
 
         # Run the agent
         result = await takeoff_agent.run(messages, deps=deps)
@@ -83,31 +76,22 @@ async def stream_takeoff(request: TakeoffRequest):
             # Send initial progress
             yield StreamService.progress_event(0, 100, "Fetching blueprint...")
 
-            # Fetch the blueprint
-            pdf_bytes = await PDFService.fetch_pdf(request.blueprint_url)
+            # Fetch the blueprint file
+            file_bytes = await FileService.fetch_file(request.blueprint_url)
+            file_info = FileService.get_file_info(file_bytes)
+            mime_type = FileService.get_mime_type(file_bytes)
+
             yield StreamService.progress_event(10, 100, "Blueprint loaded")
-
-            # Get PDF info
-            if PDFService.is_pdf(pdf_bytes):
-                pdf_info = PDFService.get_pdf_info(pdf_bytes)
-                yield StreamService.format_sse("info", {
-                    "type": "pdf",
-                    "page_count": pdf_info["page_count"],
-                })
-
-                yield StreamService.progress_event(15, 100, "Converting pages to images...")
-                images = PDFService.pdf_to_images(pdf_bytes)
-            else:
-                yield StreamService.format_sse("info", {"type": "image", "page_count": 1})
-                images = [pdf_bytes]
-
-            yield StreamService.progress_event(25, 100, f"Processing {len(images)} page(s)")
+            yield StreamService.format_sse("info", {
+                "type": file_info["file_type"],
+                "size": file_info["size"],
+            })
 
             # Scale detection
             scale = request.scale
-            if not scale and request.auto_detect_scale and images:
-                yield StreamService.progress_event(30, 100, "Detecting scale...")
-                scale_result = await detect_scale(images[0])
+            if not scale and request.auto_detect_scale:
+                yield StreamService.progress_event(20, 100, "Detecting scale...")
+                scale_result = await detect_scale(file_bytes)
 
                 if scale_result.detected and scale_result.scale_info:
                     scale = scale_result.scale_info.scale_string
@@ -123,20 +107,21 @@ async def stream_takeoff(request: TakeoffRequest):
                         "reasoning": scale_result.reasoning,
                     })
 
-            yield StreamService.progress_event(40, 100, "Analyzing blueprint...")
+            yield StreamService.progress_event(30, 100, "Analyzing blueprint...")
 
             # Create dependencies
             deps = TakeoffDeps(
                 project_id="temp",
-                blueprint_images=images,
+                blueprint_data=file_bytes,
                 scale=scale,
                 focus_areas=request.focus_areas,
             )
 
-            # Build messages with images
-            messages = ["Analyze this blueprint and perform a complete quantity takeoff."]
-            for i, img in enumerate(images):
-                messages.append(BinaryContent(data=img, media_type="image/png"))
+            # Build message with file (Gemini handles PDF/images directly)
+            messages = [
+                "Analyze this blueprint and perform a complete quantity takeoff.",
+                BinaryContent(data=file_bytes, media_type=mime_type),
+            ]
 
             # Run the agent with streaming
             async with takeoff_agent.run_stream(messages, deps=deps) as response:
@@ -181,21 +166,11 @@ async def detect_blueprint_scale(
     Returns scale information if detected.
     """
     try:
-        # Fetch the blueprint
-        pdf_bytes = await PDFService.fetch_pdf(blueprint_url)
+        # Fetch the blueprint file
+        file_bytes = await FileService.fetch_file(blueprint_url)
 
-        # Get first page as image
-        if PDFService.is_pdf(pdf_bytes):
-            images = PDFService.pdf_to_images(pdf_bytes, dpi=200)
-            image = images[0] if images else None
-        else:
-            image = pdf_bytes
-
-        if not image:
-            raise HTTPException(status_code=400, detail="Could not extract image from blueprint")
-
-        # Detect scale
-        result = await detect_scale(image)
+        # Detect scale (Gemini handles PDF/images directly)
+        result = await detect_scale(file_bytes)
 
         return {
             "detected": result.detected,

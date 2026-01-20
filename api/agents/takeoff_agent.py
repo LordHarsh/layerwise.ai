@@ -1,5 +1,8 @@
+import os
 from dataclasses import dataclass
+
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.models.openai import OpenAIModel
 
 from api.models import TakeoffResult, TakeoffItem, MeasurementCategory
 
@@ -8,13 +11,20 @@ from api.models import TakeoffResult, TakeoffItem, MeasurementCategory
 class TakeoffDeps:
     """Dependencies for the takeoff agent."""
     project_id: str
-    blueprint_images: list[bytes]
+    blueprint_data: bytes  # Raw PDF or image bytes
     scale: str | None = None
     focus_areas: list[str] | None = None
 
 
+# Use Gemini via OpenAI-compatible endpoint (lighter SDK)
+gemini_model = OpenAIModel(
+    "gemini-2.0-flash",
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    api_key=os.environ.get("GOOGLE_API_KEY"),
+)
+
 takeoff_agent = Agent(
-    "google-gla:gemini-2.0-flash",
+    gemini_model,
     deps_type=TakeoffDeps,
     output_type=TakeoffResult,
     instructions="""You are an expert construction estimator analyzing architectural blueprints.

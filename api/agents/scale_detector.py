@@ -1,6 +1,9 @@
+import os
 from dataclasses import dataclass
+
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIModel
 
 from api.models import ScaleInfo
 
@@ -15,11 +18,18 @@ class ScaleDetectionResult(BaseModel):
 @dataclass
 class ScaleDetectorDeps:
     """Dependencies for scale detection."""
-    image_data: bytes
+    file_data: bytes
 
+
+# Use Gemini via OpenAI-compatible endpoint (lighter SDK)
+gemini_model = OpenAIModel(
+    "gemini-2.0-flash",
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+    api_key=os.environ.get("GOOGLE_API_KEY"),
+)
 
 scale_detector_agent = Agent(
-    "google-gla:gemini-2.0-flash",
+    gemini_model,
     deps_type=ScaleDetectorDeps,
     output_type=ScaleDetectionResult,
     instructions="""You are an expert at reading architectural drawings and identifying scale notations.
@@ -69,16 +79,18 @@ Always explain your reasoning.
 )
 
 
-async def detect_scale(image_data: bytes) -> ScaleDetectionResult:
-    """Detect the scale from a blueprint image."""
+async def detect_scale(file_data: bytes) -> ScaleDetectionResult:
+    """Detect the scale from a blueprint (PDF or image)."""
     from pydantic_ai.messages import BinaryContent
+    from api.services import FileService
 
-    deps = ScaleDetectorDeps(image_data=image_data)
+    deps = ScaleDetectorDeps(file_data=file_data)
+    mime_type = FileService.get_mime_type(file_data)
 
     result = await scale_detector_agent.run(
         [
             "Analyze this architectural drawing and identify the scale.",
-            BinaryContent(data=image_data, media_type="image/png")
+            BinaryContent(data=file_data, media_type=mime_type)
         ],
         deps=deps
     )

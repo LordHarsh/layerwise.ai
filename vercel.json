@@ -8,7 +8,9 @@
     "api/index.py": {
       "runtime": "@vercel/python@4.3.1",
       "maxDuration": 60,
-      "memory": 512
+      "memory": 512,
+      "includeFiles": "api/**/*.py",
+      "excludeFiles": "api/{venv,__pycache__}/**"
     }
   },
   "rewrites": [

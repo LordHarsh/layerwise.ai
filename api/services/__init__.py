@@ -1,7 +1,7 @@
-from .pdf_service import PDFService
+from .pdf_service import FileService
 from .stream_service import StreamService
 
 __all__ = [
-    "PDFService",
+    "FileService",
     "StreamService",
 ]
