@@ -1,17 +1,21 @@
 import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
-import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { getAuth } from "@clerk/nextjs/server";
 
-export async function POST(request: Request): Promise<NextResponse> {
-  const body = (await request.json()) as HandleUploadBody;
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
 
   try {
+    const body = req.body as HandleUploadBody;
+
     const jsonResponse = await handleUpload({
       body,
-      request,
-      onBeforeGenerateToken: async (pathname) => {
+      request: req as unknown as Request,
+      onBeforeGenerateToken: async () => {
         // Verify authentication
-        const { userId } = await auth();
+        const { userId } = getAuth(req);
         if (!userId) {
           throw new Error("Unauthorized");
         }
@@ -27,17 +31,13 @@ export async function POST(request: Request): Promise<NextResponse> {
           tokenPayload: JSON.stringify({ userId }),
         };
       },
-      onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // Optional: save to database, etc.
+      onUploadCompleted: async ({ blob }) => {
         console.log("Upload completed:", blob.url);
       },
     });
 
-    return NextResponse.json(jsonResponse);
+    return res.status(200).json(jsonResponse);
   } catch (error) {
-    return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 400 }
-    );
+    return res.status(400).json({ error: (error as Error).message });
   }
 }
