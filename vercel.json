@@ -5,7 +5,7 @@
   "framework": "nextjs",
   "functions": {
     "api/index.py": {
-      "runtime": "@vercel/python",
+      "runtime": "@vercel/python@6.1.6",
       "maxDuration": 60,
       "memory": 512,
       "includeFiles": "api/**/*.py",
