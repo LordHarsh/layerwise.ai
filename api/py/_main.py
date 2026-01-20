@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from py_api.routers import takeoffs_router
+from api.py.routers import takeoffs_router
 
 # Configure logging
 logging.basicConfig(
@@ -57,9 +57,9 @@ app.add_middleware(
 )
 
 # Include routers
-# Mount at /py_api/index for Vercel (receives full path /py_api/index/takeoff/*)
+# Mount at /api/py/index for Vercel (receives full path /api/py/index/takeoff/*)
 # Also mount at root for local development (/takeoff/*)
-app.include_router(takeoffs_router, prefix="/py_api/index")
+app.include_router(takeoffs_router, prefix="/api/py/index")
 app.include_router(takeoffs_router)  # Local dev fallback
 
 
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     debug = os.getenv("DEBUG", "false").lower() == "true"
 
     uvicorn.run(
-        "py_api._main:app",
+        "api.py._main:app",
         host=host,
         port=port,
         reload=debug,
