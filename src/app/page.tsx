@@ -66,7 +66,7 @@ export default async function Home() {
               Upload your construction blueprints and extract quantities instantly.
               Doors, windows, walls, areas — measured and counted automatically.
             </p>
-            <div className="mt-8 flex items-center gap-4">
+            <div className="mt-8">
               <Link
                 href="/sign-up"
                 className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-blue-700"
@@ -85,12 +85,6 @@ export default async function Home() {
                     d="M13 7l5 5m0 0l-5 5m5-5H6"
                   />
                 </svg>
-              </Link>
-              <Link
-                href="/sign-in"
-                className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-6 py-3 text-base font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-              >
-                View Demo
               </Link>
             </div>
             <div className="mt-8 flex items-center gap-6 text-sm text-neutral-500">
