@@ -57,9 +57,10 @@ app.add_middleware(
 )
 
 # Include routers
-# On Vercel, requests come via /api/index/* rewrite, so no prefix needed
-# Locally, we access directly at /takeoff/*
-app.include_router(takeoffs_router)
+# Mount at /api/index for Vercel (receives full path /api/index/takeoff/*)
+# Also mount at root for local development (/takeoff/*)
+app.include_router(takeoffs_router, prefix="/api/index")
+app.include_router(takeoffs_router)  # Local dev fallback
 
 
 @app.get("/")
