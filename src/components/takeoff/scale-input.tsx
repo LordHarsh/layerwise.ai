@@ -11,10 +11,10 @@ interface ScaleInputProps {
 }
 
 const commonScales = [
-  { label: '1/4" = 1\'-0"', value: '1/4" = 1\'-0"' },
-  { label: '1/8" = 1\'-0"', value: '1/8" = 1\'-0"' },
-  { label: '1/2" = 1\'-0"', value: '1/2" = 1\'-0"' },
-  { label: '1" = 10\'', value: '1" = 10\'' },
+  { label: `1/4" = 1'-0"`, value: `1/4" = 1'-0"` },
+  { label: `1/8" = 1'-0"`, value: `1/8" = 1'-0"` },
+  { label: `1/2" = 1'-0"`, value: `1/2" = 1'-0"` },
+  { label: `1" = 10'`, value: `1" = 10'` },
   { label: "1:50", value: "1:50" },
   { label: "1:100", value: "1:100" },
 ];
@@ -82,7 +82,7 @@ export function ScaleInput({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder='Enter scale (e.g., 1/4" = 1\'-0")'
+          placeholder={`Enter scale (e.g., 1/4" = 1'-0")`}
           disabled={disabled}
           className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
