@@ -11,116 +11,146 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <h1 className="text-xl font-semibold">Layerwise</h1>
+      <header className="border-b border-neutral-100">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-8">
+            <Link href="/dashboard" className="text-lg font-semibold text-neutral-900">
+              Layerwise
+            </Link>
+            <nav className="hidden items-center gap-6 md:flex">
+              <Link
+                href="/dashboard"
+                className="text-sm font-medium text-neutral-900"
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/projects"
+                className="text-sm text-neutral-500 transition-colors hover:text-neutral-900"
+              >
+                Projects
+              </Link>
+            </nav>
+          </div>
           <UserButton afterSignOutUrl="/" />
         </div>
       </header>
 
       {/* Main content */}
-      <main className="mx-auto max-w-7xl px-4 py-8">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-neutral-900">
-            Welcome, {user.firstName || "User"}
-          </h2>
-          <p className="mt-1 text-neutral-600">
-            Upload a blueprint to get started with AI-powered takeoff analysis.
+      <main className="mx-auto max-w-6xl px-6 py-12">
+        {/* Welcome */}
+        <div className="mb-12">
+          <h1 className="text-2xl font-semibold text-neutral-900">
+            Welcome back, {user.firstName || "there"}
+          </h1>
+          <p className="mt-1 text-neutral-500">
+            Start a new takeoff or continue where you left off.
           </p>
         </div>
 
-        {/* Quick actions */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* New Takeoff Card */}
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
-              <svg
-                className="h-6 w-6 text-blue-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4v16m8-8H4"
-                />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-neutral-900">
-              New Takeoff
-            </h3>
-            <p className="mt-1 text-sm text-neutral-600">
-              Upload a blueprint PDF or image to start a new quantity takeoff.
-            </p>
-            <Link
-              href="/takeoff"
-              className="mt-4 block w-full rounded-md bg-blue-600 px-4 py-2 text-center text-sm font-medium text-white hover:bg-blue-700"
+        {/* Upload Area */}
+        <Link
+          href="/takeoff"
+          className="group mb-12 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-16 transition-all hover:border-neutral-300 hover:bg-neutral-50"
+        >
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 bg-white transition-colors group-hover:border-neutral-300">
+            <svg
+              className="h-5 w-5 text-neutral-400 transition-colors group-hover:text-neutral-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
             >
-              Start New Takeoff
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 4.5v15m7.5-7.5h-15"
+              />
+            </svg>
+          </div>
+          <span className="text-sm font-medium text-neutral-700">
+            New Takeoff
+          </span>
+          <span className="mt-1 text-xs text-neutral-400">
+            Upload PDF or image to analyze
+          </span>
+        </Link>
+
+        {/* Recent Projects */}
+        <section>
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-sm font-medium text-neutral-900">Recent Projects</h2>
+            <Link
+              href="/projects"
+              className="text-xs text-neutral-400 transition-colors hover:text-neutral-600"
+            >
+              View all
             </Link>
           </div>
 
-          {/* Recent Projects Card */}
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-100">
-              <svg
-                className="h-6 w-6 text-neutral-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                />
-              </svg>
+          {/* Empty state */}
+          <div className="rounded-xl border border-neutral-100 bg-neutral-50/30">
+            <div className="flex flex-col items-center justify-center py-16">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100">
+                <svg
+                  className="h-5 w-5 text-neutral-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
+                  />
+                </svg>
+              </div>
+              <p className="text-sm text-neutral-500">No projects yet</p>
+              <p className="mt-1 text-xs text-neutral-400">
+                Your takeoff results will appear here
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-neutral-900">
-              Recent Projects
-            </h3>
-            <p className="mt-1 text-sm text-neutral-600">
-              No projects yet. Start by uploading your first blueprint.
-            </p>
           </div>
+        </section>
 
-          {/* Help Card */}
-          <div className="rounded-lg border bg-white p-6 shadow-sm">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-              <svg
-                className="h-6 w-6 text-green-600"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+        {/* Quick Info */}
+        <section className="mt-12 grid gap-px overflow-hidden rounded-xl border border-neutral-100 bg-neutral-100 md:grid-cols-4">
+          <div className="bg-white p-6">
+            <div className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+              Count
             </div>
-            <h3 className="text-lg font-semibold text-neutral-900">
-              How It Works
-            </h3>
-            <p className="mt-1 text-sm text-neutral-600">
-              Our AI analyzes blueprints to extract counts, linear measurements,
-              areas, and volumes.
-            </p>
-            <ul className="mt-3 space-y-1 text-sm text-neutral-600">
-              <li>• Count: Doors, windows, fixtures</li>
-              <li>• Linear: Walls, pipes, trim</li>
-              <li>• Area: Floors, surfaces</li>
-              <li>• Volume: Concrete, excavation</li>
-            </ul>
+            <div className="mt-1 text-sm text-neutral-600">
+              Doors, windows, fixtures
+            </div>
           </div>
-        </div>
+          <div className="bg-white p-6">
+            <div className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+              Linear
+            </div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Walls, pipes, wiring
+            </div>
+          </div>
+          <div className="bg-white p-6">
+            <div className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+              Area
+            </div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Floors, roofing, paint
+            </div>
+          </div>
+          <div className="bg-white p-6">
+            <div className="text-xs font-medium uppercase tracking-wider text-neutral-400">
+              Volume
+            </div>
+            <div className="mt-1 text-sm text-neutral-600">
+              Concrete, excavation
+            </div>
+          </div>
+        </section>
       </main>
     </div>
   );

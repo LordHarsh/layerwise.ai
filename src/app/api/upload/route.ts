@@ -1,62 +1,43 @@
-import { put } from "@vercel/blob";
+import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const body = (await request.json()) as HandleUploadBody;
+
   try {
-    // Verify authentication
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async (pathname) => {
+        // Verify authentication
+        const { userId } = await auth();
+        if (!userId) {
+          throw new Error("Unauthorized");
+        }
 
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    // Validate file type
-    const allowedTypes = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json(
-        { error: "Invalid file type. Please upload a PDF or image file." },
-        { status: 400 }
-      );
-    }
-
-    // Validate file size (50MB max)
-    const maxSize = 50 * 1024 * 1024;
-    if (file.size > maxSize) {
-      return NextResponse.json(
-        { error: "File too large. Maximum size is 50MB." },
-        { status: 400 }
-      );
-    }
-
-    // Generate unique filename
-    const timestamp = Date.now();
-    const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const filename = `blueprints/${userId}/${timestamp}-${safeName}`;
-
-    // Upload to Vercel Blob
-    const blob = await put(filename, file, {
-      access: "public",
-      addRandomSuffix: false,
+        return {
+          allowedContentTypes: [
+            "application/pdf",
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+          ],
+          maximumSizeInBytes: 50 * 1024 * 1024, // 50MB
+          tokenPayload: JSON.stringify({ userId }),
+        };
+      },
+      onUploadCompleted: async ({ blob, tokenPayload }) => {
+        // Optional: save to database, etc.
+        console.log("Upload completed:", blob.url);
+      },
     });
 
-    return NextResponse.json({
-      url: blob.url,
-      filename: file.name,
-      size: file.size,
-      type: file.type,
-    });
+    return NextResponse.json(jsonResponse);
   } catch (error) {
-    console.error("Upload error:", error);
     return NextResponse.json(
-      { error: "Failed to upload file" },
-      { status: 500 }
+      { error: (error as Error).message },
+      { status: 400 }
     );
   }
 }

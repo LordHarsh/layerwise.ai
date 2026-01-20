@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
+import { upload } from "@vercel/blob/client";
 import { Upload, File, X, Loader2 } from "lucide-react";
 
 interface UploadZoneProps {
@@ -11,11 +12,13 @@ interface UploadZoneProps {
 export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [uploadedFile, setUploadedFile] = useState<{
     name: string;
     url: string;
   } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -28,30 +31,39 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
   }, []);
 
   const uploadFile = async (file: File) => {
+    // Validate file type
+    const allowedTypes = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setError("Invalid file type. Please upload a PDF or image.");
+      return;
+    }
+
+    // Validate file size (50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      setError("File too large. Maximum size is 50MB.");
+      return;
+    }
+
     setIsUploading(true);
+    setUploadProgress(0);
     setError(null);
 
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
+      const blob = await upload(file.name, file, {
+        access: "public",
+        handleUploadUrl: "/api/upload",
+        onUploadProgress: (progress) => {
+          setUploadProgress(Math.round(progress.percentage));
+        },
       });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Upload failed");
-      }
-
-      const data = await response.json();
-      setUploadedFile({ name: file.name, url: data.url });
-      onUploadComplete(data.url, file.name);
+      setUploadedFile({ name: file.name, url: blob.url });
+      onUploadComplete(blob.url, file.name);
     } catch (err) {
-      setError((err as Error).message);
+      setError((err as Error).message || "Upload failed");
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -85,27 +97,30 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
   const clearFile = useCallback(() => {
     setUploadedFile(null);
     setError(null);
+    if (inputRef.current) {
+      inputRef.current.value = "";
+    }
   }, []);
 
   if (uploadedFile) {
     return (
-      <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
+      <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-100">
-              <File className="h-5 w-5 text-green-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-neutral-200">
+              <File className="h-5 w-5 text-neutral-600" />
             </div>
             <div>
-              <p className="font-medium text-green-900">{uploadedFile.name}</p>
-              <p className="text-sm text-green-600">Ready for analysis</p>
+              <p className="text-sm font-medium text-neutral-900">{uploadedFile.name}</p>
+              <p className="text-xs text-neutral-500">Ready for analysis</p>
             </div>
           </div>
           <button
             onClick={clearFile}
-            className="rounded-full p-1 hover:bg-green-200"
+            className="rounded-full p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 transition-colors"
             disabled={disabled}
           >
-            <X className="h-5 w-5 text-green-600" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -117,13 +132,14 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
+      className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-all ${
         isDragging
-          ? "border-blue-500 bg-blue-50"
-          : "border-neutral-300 hover:border-neutral-400"
+          ? "border-neutral-400 bg-neutral-100"
+          : "border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
       } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
     >
       <input
+        ref={inputRef}
         type="file"
         accept=".pdf,image/png,image/jpeg,image/webp"
         onChange={handleFileSelect}
@@ -134,27 +150,38 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
       <div className="flex flex-col items-center gap-3">
         {isUploading ? (
           <>
-            <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-            <p className="text-sm font-medium text-neutral-700">Uploading...</p>
+            <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
+            <div className="w-full max-w-[200px]">
+              <div className="mb-1 flex justify-between text-xs text-neutral-500">
+                <span>Uploading...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-200">
+                <div
+                  className="h-full bg-neutral-900 transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
           </>
         ) : (
           <>
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-              <Upload className="h-6 w-6 text-blue-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 bg-white">
+              <Upload className="h-5 w-5 text-neutral-400" />
             </div>
             <div>
-              <p className="font-medium text-neutral-900">
-                Drop your blueprint here
+              <p className="text-sm font-medium text-neutral-700">
+                Drop blueprint here
               </p>
-              <p className="text-sm text-neutral-500">
-                or click to browse (PDF, PNG, JPG up to 50MB)
+              <p className="mt-1 text-xs text-neutral-400">
+                PDF, PNG, JPG up to 50MB
               </p>
             </div>
           </>
         )}
 
         {error && (
-          <p className="mt-2 text-sm text-red-600">{error}</p>
+          <p className="mt-2 text-xs text-red-500">{error}</p>
         )}
       </div>
     </div>
