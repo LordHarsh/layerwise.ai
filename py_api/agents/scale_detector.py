@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
 
-from api.models import ScaleInfo
+from py_api.models import ScaleInfo
 
 
 class ScaleDetectionResult(BaseModel):
@@ -82,7 +82,7 @@ Always explain your reasoning.
 async def detect_scale(file_data: bytes) -> ScaleDetectionResult:
     """Detect the scale from a blueprint (PDF or image)."""
     from pydantic_ai.messages import BinaryContent
-    from api.services import FileService
+    from py_api.services import FileService
 
     deps = ScaleDetectorDeps(file_data=file_data)
     mime_type = FileService.get_mime_type(file_data)

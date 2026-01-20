@@ -5,9 +5,9 @@ from fastapi import APIRouter, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 from pydantic_ai.messages import BinaryContent
 
-from api.models import TakeoffRequest, TakeoffResult
-from api.agents import takeoff_agent, TakeoffDeps, detect_scale
-from api.services import FileService, StreamService
+from py_api.models import TakeoffRequest, TakeoffResult
+from py_api.agents import takeoff_agent, TakeoffDeps, detect_scale
+from py_api.services import FileService, StreamService
 
 logger = logging.getLogger(__name__)
 
