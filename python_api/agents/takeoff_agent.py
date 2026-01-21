@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.openai import OpenAIModel
 
-from api.py.models import TakeoffResult, TakeoffItem, MeasurementCategory
+from python_api.models import TakeoffResult, TakeoffItem, MeasurementCategory
 
 
 @dataclass

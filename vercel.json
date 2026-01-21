@@ -4,12 +4,18 @@
   "installCommand": "pnpm install",
   "framework": "nextjs",
   "functions": {
-    "api/py/index.py": {
+    "python_api/index.py": {
       "runtime": "@vercel/python@6.1.6",
       "maxDuration": 60,
       "memory": 512,
-      "includeFiles": "api/py/**/*.py",
-      "excludeFiles": "{node_modules,api/py/venv,**/__pycache__,*.pyc,*.pyo,.git,.next,out,build,coverage,.vercel,resources,tests}/**"
+      "includeFiles": "python_api/**/*.py",
+      "excludeFiles": "{node_modules,python_api/venv,**/__pycache__,*.pyc,*.pyo,.git,.next,out,build,coverage,.vercel,resources,tests}/**"
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/python/:path*",
+      "destination": "/python_api/index"
+    }
+  ]
 }
