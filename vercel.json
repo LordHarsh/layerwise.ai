@@ -4,7 +4,7 @@
   "installCommand": "pnpm install",
   "framework": "nextjs",
   "functions": {
-    "python_api/index.py": {
+    "api/py.py": {
       "runtime": "@vercel/python@6.1.6",
       "maxDuration": 60,
       "memory": 512,
@@ -15,7 +15,7 @@
   "rewrites": [
     {
       "source": "/python/:path*",
-      "destination": "/python_api/index"
+      "destination": "/api/py"
     }
   ]
 }

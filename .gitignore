@@ -40,6 +40,32 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# claude
 .claude
-*claude*
+
+# vercel
 .vercel
+
+# env files
+.env*.local
+
+# Python
+python_api/venv/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.eggs/
+*.egg-info/
+*.egg
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db

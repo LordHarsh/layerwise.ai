@@ -1,13 +1,12 @@
 # Ignore Python virtual environment
-api/venv/
-api/__pycache__/
+python_api/venv/
 **/__pycache__/
 *.pyc
 
 # Ignore local env files
 .env
 .env.local
-api/.env
+python_api/.env
 
 # Ignore resources docs (not needed in deployment)
 resources/

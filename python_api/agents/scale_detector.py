@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
 
 from python_api.models import ScaleInfo
 
@@ -22,11 +23,11 @@ class ScaleDetectorDeps:
 
 
 # Use Gemini via OpenAI-compatible endpoint (lighter SDK)
-gemini_model = OpenAIModel(
-    "gemini-2.0-flash",
+_provider = OpenAIProvider(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-    api_key=os.environ.get("GOOGLE_API_KEY"),
+    api_key=os.environ.get("GOOGLE_API_KEY", ""),
 )
+gemini_model = OpenAIModel("gemini-2.0-flash", provider=_provider)
 
 scale_detector_agent = Agent(
     gemini_model,

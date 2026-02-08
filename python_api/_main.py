@@ -64,6 +64,8 @@ app.include_router(takeoffs_router)  # Local dev fallback
 
 
 @app.get("/")
+@app.get("/python")
+@app.get("/python/")
 async def root():
     """Root endpoint."""
     return {
@@ -74,6 +76,7 @@ async def root():
 
 
 @app.get("/api/health")
+@app.get("/python/health")
 async def health_check():
     """Health check endpoint."""
     return {
