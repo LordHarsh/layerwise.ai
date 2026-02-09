@@ -1,5 +1,7 @@
 "use client";
 
+import { CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
 import type { ProgressEvent } from "@/types";
 
 interface ProgressBarProps {
@@ -15,16 +17,29 @@ export function ProgressBar({ progress, status }: ProgressBarProps) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium text-neutral-700">{message}</span>
-        <span className="text-neutral-500">{percentage}%</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {status === "complete" ? (
+            <CheckCircle2 className="size-3.5 text-emerald-500" />
+          ) : status === "error" ? (
+            <AlertCircle className="size-3.5 text-destructive" />
+          ) : (
+            <Loader2 className="size-3.5 animate-spin text-muted-foreground" />
+          )}
+          <span className="text-xs font-medium text-muted-foreground">{message}</span>
+        </div>
+        <span className="text-xs tabular-nums text-muted-foreground">{percentage}%</span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-neutral-200">
-        <div
-          className={`h-full transition-all duration-300 ${getBarColor(status)}`}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
+      <Progress
+        value={percentage}
+        className={`h-1.5 ${
+          status === "error"
+            ? "*:data-[slot=progress-indicator]:bg-destructive"
+            : status === "complete"
+              ? "*:data-[slot=progress-indicator]:bg-emerald-500"
+              : ""
+        }`}
+      />
     </div>
   );
 }
@@ -41,16 +56,5 @@ function getDefaultMessage(status: string): string {
       return "Error occurred";
     default:
       return "";
-  }
-}
-
-function getBarColor(status: string): string {
-  switch (status) {
-    case "error":
-      return "bg-red-500";
-    case "complete":
-      return "bg-green-500";
-    default:
-      return "bg-blue-500";
   }
 }

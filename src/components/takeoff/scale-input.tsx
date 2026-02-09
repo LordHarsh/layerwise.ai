@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import type { ScaleEvent } from "@/types";
 
 interface ScaleInputProps {
@@ -34,63 +38,62 @@ export function ScaleInput({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-neutral-700">
-          Blueprint Scale
-        </label>
-        {detectedScale?.detected && (
-          <span className="text-xs text-green-600">
-            Auto-detected: {detectedScale.scale} ({Math.round((detectedScale.confidence || 0) * 100)}% confident)
+      {/* Auto-detect badge */}
+      {detectedScale?.detected && (
+        <div className="flex items-center gap-2 rounded-md bg-muted/50 px-2.5 py-1.5">
+          <Sparkles className="size-3.5 text-amber-500" />
+          <span className="text-xs text-muted-foreground">
+            Auto-detected:{" "}
+            <strong className="font-semibold text-foreground">{detectedScale.scale}</strong>
           </span>
-        )}
-      </div>
+          <Badge variant="secondary" className="ml-auto text-[10px]">
+            {Math.round((detectedScale.confidence || 0) * 100)}%
+          </Badge>
+        </div>
+      )}
 
-      {/* Quick select buttons */}
-      <div className="flex flex-wrap gap-2">
+      {/* Preset buttons */}
+      <div className="grid grid-cols-2 gap-1.5">
         {commonScales.map((scale) => (
-          <button
+          <Button
             key={scale.value}
             type="button"
+            variant={value === scale.value && !isCustom ? "default" : "outline"}
+            size="sm"
             onClick={() => handlePresetClick(scale.value)}
             disabled={disabled}
-            className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-              value === scale.value && !isCustom
-                ? "border-blue-500 bg-blue-50 text-blue-700"
-                : "border-neutral-300 hover:border-neutral-400"
-            } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+            className="h-8 text-xs"
           >
             {scale.label}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
           type="button"
+          variant={isCustom ? "default" : "outline"}
+          size="sm"
           onClick={() => setIsCustom(true)}
           disabled={disabled}
-          className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
-            isCustom
-              ? "border-blue-500 bg-blue-50 text-blue-700"
-              : "border-neutral-300 hover:border-neutral-400"
-          } ${disabled ? "cursor-not-allowed opacity-50" : ""}`}
+          className="col-span-2 h-8 text-xs"
         >
-          Custom
-        </button>
+          Custom Scale
+        </Button>
       </div>
 
       {/* Custom input */}
       {isCustom && (
-        <input
+        <Input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={`Enter scale (e.g., 1/4" = 1'-0")`}
           disabled={disabled}
-          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="h-8 text-xs"
         />
       )}
 
-      {/* Auto-detect info */}
+      {/* Auto-detect failure */}
       {detectedScale && !detectedScale.detected && (
-        <p className="text-xs text-amber-600">
+        <p className="text-xs text-amber-600 dark:text-amber-400">
           Could not auto-detect scale. Please select or enter manually.
         </p>
       )}

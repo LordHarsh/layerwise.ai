@@ -2,7 +2,9 @@
 
 import { useState, useCallback, useRef } from "react";
 import { upload } from "@vercel/blob/client";
-import { Upload, File, X, Loader2 } from "lucide-react";
+import { Upload, FileText, X, Loader2, ImageIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 
 interface UploadZoneProps {
   onUploadComplete: (url: string, filename: string) => void;
@@ -31,14 +33,12 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
   }, []);
 
   const uploadFile = async (file: File) => {
-    // Validate file type
     const allowedTypes = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       setError("Invalid file type. Please upload a PDF or image.");
       return;
     }
 
-    // Validate file size (50MB)
     if (file.size > 50 * 1024 * 1024) {
       setError("File too large. Maximum size is 50MB.");
       return;
@@ -49,8 +49,6 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
     setError(null);
 
     try {
-      // Use a clean ID as the blob pathname to avoid URL encoding issues
-      // with special characters in filenames (spaces, parentheses, etc.)
       const ext = file.name.split(".").pop() || "pdf";
       const blobPath = `blueprints/${crypto.randomUUID()}.${ext}`;
 
@@ -108,26 +106,29 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
   }, []);
 
   if (uploadedFile) {
+    const isPdf = uploadedFile.name.toLowerCase().endsWith(".pdf");
     return (
-      <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white border border-neutral-200">
-              <File className="h-5 w-5 text-neutral-600" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-neutral-900">{uploadedFile.name}</p>
-              <p className="text-xs text-neutral-500">Ready for analysis</p>
-            </div>
-          </div>
-          <button
-            onClick={clearFile}
-            className="rounded-full p-1.5 text-neutral-400 hover:bg-neutral-200 hover:text-neutral-600 transition-colors"
-            disabled={disabled}
-          >
-            <X className="h-4 w-4" />
-          </button>
+      <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background">
+          {isPdf ? (
+            <FileText className="size-4 text-red-500" />
+          ) : (
+            <ImageIcon className="size-4 text-blue-500" />
+          )}
         </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{uploadedFile.name}</p>
+          <p className="text-xs text-muted-foreground">Ready for analysis</p>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={clearFile}
+          disabled={disabled}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <X className="size-3.5" />
+        </Button>
       </div>
     );
   }
@@ -137,11 +138,11 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className={`relative rounded-lg border-2 border-dashed p-8 text-center transition-all ${
+      className={`relative cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-all ${
         isDragging
-          ? "border-neutral-400 bg-neutral-100"
-          : "border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50"
-      } ${disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"}`}
+          ? "border-primary bg-primary/5"
+          : "border-muted-foreground/20 hover:border-muted-foreground/40 hover:bg-muted/50"
+      } ${disabled ? "pointer-events-none opacity-50" : ""}`}
     >
       <input
         ref={inputRef}
@@ -152,33 +153,26 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
         className="absolute inset-0 cursor-pointer opacity-0"
       />
 
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-2">
         {isUploading ? (
           <>
-            <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
-            <div className="w-full max-w-[200px]">
-              <div className="mb-1 flex justify-between text-xs text-neutral-500">
+            <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            <div className="w-full max-w-45 space-y-1.5">
+              <div className="flex justify-between text-xs text-muted-foreground">
                 <span>Uploading...</span>
                 <span>{uploadProgress}%</span>
               </div>
-              <div className="h-1 w-full overflow-hidden rounded-full bg-neutral-200">
-                <div
-                  className="h-full bg-neutral-900 transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
+              <Progress value={uploadProgress} className="h-1.5" />
             </div>
           </>
         ) : (
           <>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-neutral-200 bg-white">
-              <Upload className="h-5 w-5 text-neutral-400" />
+            <div className="flex size-9 items-center justify-center rounded-full border bg-background">
+              <Upload className="size-4 text-muted-foreground" />
             </div>
             <div>
-              <p className="text-sm font-medium text-neutral-700">
-                Drop blueprint here
-              </p>
-              <p className="mt-1 text-xs text-neutral-400">
+              <p className="text-sm font-medium">Drop blueprint here</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 PDF, PNG, JPG up to 50MB
               </p>
             </div>
@@ -186,7 +180,7 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
         )}
 
         {error && (
-          <p className="mt-2 text-xs text-red-500">{error}</p>
+          <p className="mt-1 text-xs text-destructive">{error}</p>
         )}
       </div>
     </div>

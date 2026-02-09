@@ -1,6 +1,16 @@
 "use client";
 
 import { useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { TakeoffItem, MeasurementCategory } from "@/types";
 
 interface ResultsTableProps {
@@ -8,24 +18,16 @@ interface ResultsTableProps {
   isStreaming?: boolean;
 }
 
-const categoryColors: Record<MeasurementCategory, string> = {
-  count: "bg-purple-100 text-purple-800",
-  linear: "bg-blue-100 text-blue-800",
-  area: "bg-green-100 text-green-800",
-  volume: "bg-orange-100 text-orange-800",
-};
-
-const categoryLabels: Record<MeasurementCategory, string> = {
-  count: "Count",
-  linear: "Linear",
-  area: "Area",
-  volume: "Volume",
+const categoryConfig: Record<MeasurementCategory, { label: string; className: string }> = {
+  count: { label: "Count", className: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
+  linear: { label: "Linear", className: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
+  area: { label: "Area", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
+  volume: { label: "Volume", className: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
 };
 
 export function ResultsTable({ items, isStreaming }: ResultsTableProps) {
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
-      // Sort by category first, then by name
       if (a.category !== b.category) {
         const order: MeasurementCategory[] = ["count", "linear", "area", "volume"];
         return order.indexOf(a.category) - order.indexOf(b.category);
@@ -41,104 +43,95 @@ export function ResultsTable({ items, isStreaming }: ResultsTableProps) {
       area: 0,
       volume: 0,
     };
-
     items.forEach((item) => {
       counts[item.category]++;
     });
-
     return counts;
   }, [items]);
 
   if (items.length === 0) {
-    return (
-      <div className="rounded-lg border bg-neutral-50 p-8 text-center">
-        <p className="text-neutral-500">
-          {isStreaming ? "Waiting for results..." : "No items found"}
-        </p>
-      </div>
-    );
+    if (isStreaming) {
+      return <ResultsTableSkeleton />;
+    }
+    return null;
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Summary badges */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-1.5">
         {(Object.entries(summary) as [MeasurementCategory, number][]).map(
           ([category, count]) =>
             count > 0 && (
-              <span
+              <Badge
                 key={category}
-                className={`rounded-full px-3 py-1 text-sm font-medium ${categoryColors[category]}`}
+                variant="secondary"
+                className={categoryConfig[category].className}
               >
-                {categoryLabels[category]}: {count}
-              </span>
+                {categoryConfig[category].label}: {count}
+              </Badge>
             )
         )}
       </div>
 
       {/* Table */}
-      <div className="overflow-hidden rounded-lg border">
-        <table className="min-w-full divide-y divide-neutral-200">
-          <thead className="bg-neutral-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">
-                Item
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">
-                Type
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">
-                Quantity
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-neutral-500">
-                Location
-              </th>
-              <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-neutral-500">
-                Confidence
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-200 bg-white">
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[40%]">Item</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead className="text-right">Quantity</TableHead>
+              <TableHead className="hidden sm:table-cell">Location</TableHead>
+              <TableHead className="text-right">Confidence</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {sortedItems.map((item, index) => (
-              <tr
+              <TableRow
                 key={`${item.name}-${index}`}
-                className={isStreaming && index === sortedItems.length - 1 ? "animate-pulse bg-blue-50" : ""}
+                className={
+                  isStreaming && index === sortedItems.length - 1
+                    ? "animate-in fade-in-0 bg-primary/5"
+                    : ""
+                }
               >
-                <td className="whitespace-nowrap px-4 py-3">
+                <TableCell>
                   <div>
-                    <p className="font-medium text-neutral-900">{item.name}</p>
+                    <p className="font-medium">{item.name}</p>
                     {item.notes && (
-                      <p className="text-xs text-neutral-500">{item.notes}</p>
+                      <p className="text-xs text-muted-foreground">{item.notes}</p>
                     )}
                   </div>
-                </td>
-                <td className="whitespace-nowrap px-4 py-3">
-                  <span
-                    className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${categoryColors[item.category]}`}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    variant="secondary"
+                    className={categoryConfig[item.category].className}
                   >
-                    {categoryLabels[item.category]}
-                  </span>
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-right">
-                  <span className="font-mono text-neutral-900">
+                    {categoryConfig[item.category].label}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <span className="font-mono tabular-nums">
                     {item.quantity.toLocaleString()}
                   </span>
-                  <span className="ml-1 text-neutral-500">{item.unit}</span>
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-neutral-500">
-                  {item.location || "—"}
-                </td>
-                <td className="whitespace-nowrap px-4 py-3 text-right">
+                  <span className="ml-1 text-muted-foreground">{item.unit}</span>
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground sm:table-cell">
+                  {item.location || "\u2014"}
+                </TableCell>
+                <TableCell className="text-right">
                   <ConfidenceBadge value={item.confidence} />
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
 
       {isStreaming && (
-        <p className="text-center text-sm text-neutral-500">
+        <p className="text-center text-xs text-muted-foreground">
           Analyzing... more items may appear
         </p>
       )}
@@ -149,16 +142,55 @@ export function ResultsTable({ items, isStreaming }: ResultsTableProps) {
 function ConfidenceBadge({ value }: { value: number }) {
   const percentage = Math.round(value * 100);
 
-  let colorClass = "bg-red-100 text-red-800";
+  let className = "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300";
   if (percentage >= 80) {
-    colorClass = "bg-green-100 text-green-800";
+    className = "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300";
   } else if (percentage >= 60) {
-    colorClass = "bg-yellow-100 text-yellow-800";
+    className = "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
   }
 
   return (
-    <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${colorClass}`}>
+    <Badge variant="secondary" className={className}>
       {percentage}%
-    </span>
+    </Badge>
+  );
+}
+
+function ResultsTableSkeleton() {
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-1.5">
+        <Skeleton className="h-5 w-16 rounded-full" />
+        <Skeleton className="h-5 w-14 rounded-full" />
+        <Skeleton className="h-5 w-12 rounded-full" />
+      </div>
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-[40%]">Item</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead className="text-right">Quantity</TableHead>
+              <TableHead className="hidden sm:table-cell">Location</TableHead>
+              <TableHead className="text-right">Confidence</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {Array.from({ length: 4 }).map((_, i) => (
+              <TableRow key={i}>
+                <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                <TableCell><Skeleton className="h-5 w-14 rounded-full" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="ml-auto h-4 w-12" /></TableCell>
+                <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
+                <TableCell className="text-right"><Skeleton className="ml-auto h-5 w-10 rounded-full" /></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <p className="text-center text-xs text-muted-foreground">
+        Analyzing... waiting for results
+      </p>
+    </div>
   );
 }
