@@ -82,16 +82,15 @@ Always explain your reasoning.
 
 async def detect_scale(file_data: bytes) -> ScaleDetectionResult:
     """Detect the scale from a blueprint (PDF or image)."""
-    from pydantic_ai.messages import BinaryContent
     from python_api.services import FileService
 
     deps = ScaleDetectorDeps(file_data=file_data)
-    mime_type = FileService.get_mime_type(file_data)
+    content_parts = FileService.to_content_parts(file_data)
 
     result = await scale_detector_agent.run(
         [
             "Analyze this architectural drawing and identify the scale.",
-            BinaryContent(data=file_data, media_type=mime_type)
+            *content_parts,
         ],
         deps=deps
     )

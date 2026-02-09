@@ -49,7 +49,12 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
     setError(null);
 
     try {
-      const blob = await upload(file.name, file, {
+      // Use a clean ID as the blob pathname to avoid URL encoding issues
+      // with special characters in filenames (spaces, parentheses, etc.)
+      const ext = file.name.split(".").pop() || "pdf";
+      const blobPath = `blueprints/${crypto.randomUUID()}.${ext}`;
+
+      const blob = await upload(blobPath, file, {
         access: "public",
         handleUploadUrl: "/api/upload",
         onUploadProgress: (progress) => {

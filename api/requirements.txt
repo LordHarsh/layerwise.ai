@@ -7,3 +7,6 @@ python-multipart
 sse-starlette
 httpx
 python-dotenv
+# PDF processing (convert pages to images for Gemini vision)
+pypdfium2
+Pillow

@@ -3,7 +3,6 @@ import logging
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
-from pydantic_ai.messages import BinaryContent
 
 from python_api.models import TakeoffRequest, TakeoffResult
 from python_api.agents import takeoff_agent, TakeoffDeps, detect_scale
@@ -23,7 +22,6 @@ async def analyze_blueprint(request: TakeoffRequest) -> TakeoffResult:
     try:
         # Fetch the blueprint file
         file_bytes = await FileService.fetch_file(request.blueprint_url)
-        mime_type = FileService.get_mime_type(file_bytes)
 
         # Determine scale
         scale = request.scale
@@ -40,10 +38,11 @@ async def analyze_blueprint(request: TakeoffRequest) -> TakeoffResult:
             focus_areas=request.focus_areas,
         )
 
-        # Build the message with file (Gemini handles PDF/images directly)
+        # Convert file to image content parts (PDFs → PNGs for Gemini compat)
+        content_parts = FileService.to_content_parts(file_bytes)
         messages = [
             "Analyze this blueprint and perform a complete quantity takeoff.",
-            BinaryContent(data=file_bytes, media_type=mime_type),
+            *content_parts,
         ]
 
         # Run the agent
@@ -79,7 +78,6 @@ async def stream_takeoff(request: TakeoffRequest):
             # Fetch the blueprint file
             file_bytes = await FileService.fetch_file(request.blueprint_url)
             file_info = FileService.get_file_info(file_bytes)
-            mime_type = FileService.get_mime_type(file_bytes)
 
             yield StreamService.progress_event(10, 100, "Blueprint loaded")
             yield StreamService.format_sse("info", {
@@ -117,39 +115,33 @@ async def stream_takeoff(request: TakeoffRequest):
                 focus_areas=request.focus_areas,
             )
 
-            # Build message with file (Gemini handles PDF/images directly)
+            # Convert file to image content parts (PDFs → PNGs for Gemini compat)
+            content_parts = FileService.to_content_parts(file_bytes)
             messages = [
                 "Analyze this blueprint and perform a complete quantity takeoff.",
-                BinaryContent(data=file_bytes, media_type=mime_type),
+                *content_parts,
             ]
 
-            # Run the agent with streaming
-            async with takeoff_agent.run_stream(messages, deps=deps) as response:
-                yield StreamService.progress_event(50, 100, "AI analyzing...")
+            # Run the agent (structured output, no text streaming)
+            yield StreamService.progress_event(50, 100, "AI analyzing...")
+            result_run = await takeoff_agent.run(messages, deps=deps)
+            result = result_run.output
 
-                # Stream partial results
-                async for chunk in response.stream():
-                    if chunk:
-                        yield StreamService.format_sse("chunk", {"text": chunk})
+            yield StreamService.progress_event(90, 100, "Finalizing results...")
 
-                # Get final result
-                result = await response.get_output()
+            # Stream individual items
+            for item in result.items:
+                yield StreamService.format_sse("item", item.model_dump())
 
-                yield StreamService.progress_event(90, 100, "Finalizing results...")
+            yield StreamService.progress_event(100, 100, "Complete")
 
-                # Stream individual items
-                for item in result.items:
-                    yield StreamService.format_sse("item", item.model_dump())
-
-                yield StreamService.progress_event(100, 100, "Complete")
-
-                # Send complete event with summary
-                yield StreamService.complete_event({
-                    "total_items": len(result.items),
-                    "summary": result.summary,
-                    "notes": result.notes,
-                    "scale_used": result.scale_used,
-                })
+            # Send complete event with summary
+            yield StreamService.complete_event({
+                "total_items": len(result.items),
+                "summary": result.summary,
+                "notes": result.notes,
+                "scale_used": result.scale_used,
+            })
 
         except Exception as e:
             yield StreamService.error_event(str(e))
