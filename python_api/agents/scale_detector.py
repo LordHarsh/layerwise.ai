@@ -1,12 +1,8 @@
-import os
-from dataclasses import dataclass
-
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openai import OpenAIProvider
+from google.genai import types
 
 from python_api.models import ScaleInfo
+from python_api.agents.gemini_utils import get_client, get_schema
 
 
 class ScaleDetectionResult(BaseModel):
@@ -16,24 +12,7 @@ class ScaleDetectionResult(BaseModel):
     reasoning: str = Field(description="Explanation of how the scale was determined")
 
 
-@dataclass
-class ScaleDetectorDeps:
-    """Dependencies for scale detection."""
-    file_data: bytes
-
-
-# Use Gemini via OpenAI-compatible endpoint (lighter SDK)
-_provider = OpenAIProvider(
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-    api_key=os.environ.get("GOOGLE_API_KEY", ""),
-)
-gemini_model = OpenAIModel("gemini-2.0-flash", provider=_provider)
-
-scale_detector_agent = Agent(
-    gemini_model,
-    deps_type=ScaleDetectorDeps,
-    output_type=ScaleDetectionResult,
-    instructions="""You are an expert at reading architectural drawings and identifying scale notations.
+SCALE_INSTRUCTIONS = """You are an expert at reading architectural drawings and identifying scale notations.
 
 Your task is to find and interpret the scale of a blueprint.
 
@@ -76,23 +55,26 @@ Your task is to find and interpret the scale of a blueprint.
 - If uncertain, confidence should be low (0.2-0.4)
 
 Always explain your reasoning.
-""",
-)
+"""
 
 
 async def detect_scale(file_data: bytes) -> ScaleDetectionResult:
     """Detect the scale from a blueprint (PDF or image)."""
     from python_api.services import FileService
 
-    deps = ScaleDetectorDeps(file_data=file_data)
     content_parts = FileService.to_content_parts(file_data)
 
-    result = await scale_detector_agent.run(
-        [
+    response = await get_client().aio.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[
             "Analyze this architectural drawing and identify the scale.",
             *content_parts,
         ],
-        deps=deps
+        config=types.GenerateContentConfig(
+            system_instruction=SCALE_INSTRUCTIONS,
+            response_mime_type="application/json",
+            response_schema=get_schema(ScaleDetectionResult),
+        ),
     )
 
-    return result.output
+    return ScaleDetectionResult.model_validate_json(response.text)

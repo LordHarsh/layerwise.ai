@@ -5,6 +5,14 @@ from .takeoff import (
     MeasurementCategory,
 )
 from .blueprint import BlueprintMeta, BlueprintPage, ScaleInfo
+from .pipeline import (
+    DocumentIntelligence,
+    Space,
+    SpaceType,
+    SpaceDetectionResult,
+    RoomTakeoff,
+    TradeAnalysis,
+)
 
 __all__ = [
     "TakeoffItem",
@@ -14,4 +22,10 @@ __all__ = [
     "BlueprintMeta",
     "BlueprintPage",
     "ScaleInfo",
+    "DocumentIntelligence",
+    "Space",
+    "SpaceType",
+    "SpaceDetectionResult",
+    "RoomTakeoff",
+    "TradeAnalysis",
 ]

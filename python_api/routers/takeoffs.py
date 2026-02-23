@@ -2,10 +2,18 @@ import logging
 
 import httpx
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 from sse_starlette.sse import EventSourceResponse
 
 from python_api.models import TakeoffRequest, TakeoffResult
-from python_api.agents import takeoff_agent, TakeoffDeps, detect_scale
+from python_api.agents import (
+    run_takeoff,
+    run_room_takeoff,
+    detect_scale,
+    analyze_document,
+    detect_spaces,
+    run_trade_analysis,
+)
 from python_api.services import FileService, StreamService
 
 logger = logging.getLogger(__name__)
@@ -13,42 +21,47 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/takeoff", tags=["takeoff"])
 
 
+# ── Request models for new endpoints ──
+
+
+class PipelineRequest(BaseModel):
+    """Request body for the pipeline streaming endpoint."""
+    blueprint_url: str = Field(description="URL of the blueprint PDF/image")
+    scale: str | None = Field(default=None, description="Manual scale override")
+
+
+class TradeDeepDiveRequest(BaseModel):
+    """Request body for the trade deep-dive endpoint."""
+    blueprint_url: str = Field(description="URL of the blueprint PDF/image")
+    trade: str = Field(description="Trade name: electrical, plumbing, hvac, structural, finishes")
+    spaces_summary: str = Field(description="Text summary of detected spaces")
+    scale: str | None = Field(default=None, description="Scale override")
+
+
+# ── Existing endpoints (backward compat) ──
+
+
 @router.post("/analyze")
 async def analyze_blueprint(request: TakeoffRequest) -> TakeoffResult:
-    """Analyze a blueprint and return takeoff results.
-
-    This is the non-streaming version that returns the complete result.
-    """
+    """Analyze a blueprint and return takeoff results (non-streaming)."""
     try:
-        # Fetch the blueprint file
         file_bytes = await FileService.fetch_file(request.blueprint_url)
 
-        # Determine scale
         scale = request.scale
         if not scale and request.auto_detect_scale:
             scale_result = await detect_scale(file_bytes)
             if scale_result.detected and scale_result.scale_info:
                 scale = scale_result.scale_info.scale_string
 
-        # Create dependencies
-        deps = TakeoffDeps(
-            project_id="temp",
-            blueprint_data=file_bytes,
+        content_parts = FileService.to_content_parts(file_bytes)
+
+        result = await run_takeoff(
+            content_parts=content_parts,
             scale=scale,
             focus_areas=request.focus_areas,
         )
 
-        # Convert file to image content parts (PDFs → PNGs for Gemini compat)
-        content_parts = FileService.to_content_parts(file_bytes)
-        messages = [
-            "Analyze this blueprint and perform a complete quantity takeoff.",
-            *content_parts,
-        ]
-
-        # Run the agent
-        result = await takeoff_agent.run(messages, deps=deps)
-
-        return result.output
+        return result
 
     except httpx.HTTPError as e:
         logger.error(f"HTTP error fetching blueprint: {e}")
@@ -60,22 +73,12 @@ async def analyze_blueprint(request: TakeoffRequest) -> TakeoffResult:
 
 @router.post("/stream")
 async def stream_takeoff(request: TakeoffRequest):
-    """Stream takeoff analysis results via Server-Sent Events.
-
-    Events:
-    - progress: Analysis progress updates
-    - item: Individual takeoff items as they're identified
-    - scale: Detected scale information
-    - complete: Final summary when analysis is done
-    - error: Error information if something fails
-    """
+    """Stream takeoff analysis results via Server-Sent Events."""
 
     async def generate():
         try:
-            # Send initial progress
             yield StreamService.progress_event(0, 100, "Fetching blueprint...")
 
-            # Fetch the blueprint file
             file_bytes = await FileService.fetch_file(request.blueprint_url)
             file_info = FileService.get_file_info(file_bytes)
 
@@ -85,7 +88,6 @@ async def stream_takeoff(request: TakeoffRequest):
                 "size": file_info["size"],
             })
 
-            # Scale detection
             scale = request.scale
             if not scale and request.auto_detect_scale:
                 yield StreamService.progress_event(20, 100, "Detecting scale...")
@@ -107,35 +109,22 @@ async def stream_takeoff(request: TakeoffRequest):
 
             yield StreamService.progress_event(30, 100, "Analyzing blueprint...")
 
-            # Create dependencies
-            deps = TakeoffDeps(
-                project_id="temp",
-                blueprint_data=file_bytes,
+            content_parts = FileService.to_content_parts(file_bytes)
+
+            yield StreamService.progress_event(50, 100, "AI analyzing...")
+            result = await run_takeoff(
+                content_parts=content_parts,
                 scale=scale,
                 focus_areas=request.focus_areas,
             )
 
-            # Convert file to image content parts (PDFs → PNGs for Gemini compat)
-            content_parts = FileService.to_content_parts(file_bytes)
-            messages = [
-                "Analyze this blueprint and perform a complete quantity takeoff.",
-                *content_parts,
-            ]
-
-            # Run the agent (structured output, no text streaming)
-            yield StreamService.progress_event(50, 100, "AI analyzing...")
-            result_run = await takeoff_agent.run(messages, deps=deps)
-            result = result_run.output
-
             yield StreamService.progress_event(90, 100, "Finalizing results...")
 
-            # Stream individual items
             for item in result.items:
                 yield StreamService.format_sse("item", item.model_dump())
 
             yield StreamService.progress_event(100, 100, "Complete")
 
-            # Send complete event with summary
             yield StreamService.complete_event({
                 "total_items": len(result.items),
                 "summary": result.summary,
@@ -153,15 +142,9 @@ async def stream_takeoff(request: TakeoffRequest):
 async def detect_blueprint_scale(
     blueprint_url: str = Query(..., description="URL of the blueprint PDF or image")
 ) -> dict:
-    """Detect the scale from a blueprint.
-
-    Returns scale information if detected.
-    """
+    """Detect the scale from a blueprint."""
     try:
-        # Fetch the blueprint file
         file_bytes = await FileService.fetch_file(blueprint_url)
-
-        # Detect scale (Gemini handles PDF/images directly)
         result = await detect_scale(file_bytes)
 
         return {
@@ -176,3 +159,181 @@ async def detect_blueprint_scale(
     except Exception as e:
         logger.exception("Scale detection failed")
         raise HTTPException(status_code=500, detail="Scale detection failed. Please try again.")
+
+
+# ── New pipeline endpoints ──
+
+
+AVAILABLE_TRADES = ["electrical", "plumbing", "hvac", "structural", "finishes"]
+
+
+@router.post("/stream-pipeline")
+async def stream_pipeline(request: PipelineRequest):
+    """Multi-phase streaming pipeline for blueprint analysis.
+
+    Phases:
+    1. Document Intelligence - doc type, scale, room estimate, complexity
+    2. Space Detection - identify all rooms/spaces
+    3. Room-by-Room Extraction - takeoff items per room
+
+    SSE Events:
+    - phase_start: { phase, name }
+    - doc_intelligence: { DocumentIntelligence }
+    - spaces: { SpaceDetectionResult }
+    - room_start: { space_id, space_name }
+    - room_items: { space_id, space_name, items[] }
+    - phase_complete: { phase }
+    - complete: { total_items, summary, available_trades[] }
+    - error: { code, message }
+    """
+
+    async def generate():
+        try:
+            # Fetch blueprint
+            yield StreamService.format_sse("progress", {"message": "Fetching blueprint..."})
+            file_bytes = await FileService.fetch_file(request.blueprint_url)
+            file_info = FileService.get_file_info(file_bytes)
+            content_parts = FileService.to_content_parts(file_bytes)
+
+            # ── Phase 1: Document Intelligence ──
+            yield StreamService.format_sse("phase_start", {
+                "phase": 1,
+                "name": "Document Intelligence",
+            })
+
+            doc_info = await analyze_document(
+                content_parts=content_parts,
+                page_count=file_info["page_count"],
+            )
+
+            # Determine scale: manual override > detected > None
+            scale = request.scale
+            if not scale and doc_info.scale:
+                scale = doc_info.scale.scale_string
+
+            yield StreamService.format_sse("doc_intelligence", doc_info.model_dump())
+            yield StreamService.format_sse("phase_complete", {"phase": 1})
+
+            # ── Phase 2: Space Detection ──
+            yield StreamService.format_sse("phase_start", {
+                "phase": 2,
+                "name": "Space Detection",
+            })
+
+            space_result = await detect_spaces(
+                content_parts=content_parts,
+                doc_type=doc_info.doc_type,
+                scale=scale,
+            )
+
+            yield StreamService.format_sse("spaces", space_result.model_dump())
+            yield StreamService.format_sse("phase_complete", {"phase": 2})
+
+            # ── Phase 3: Room-by-Room Extraction ──
+            yield StreamService.format_sse("phase_start", {
+                "phase": 3,
+                "name": "Quantity Extraction",
+            })
+
+            all_items = []
+            room_count = len(space_result.spaces)
+
+            for idx, space in enumerate(space_result.spaces):
+                yield StreamService.format_sse("room_start", {
+                    "space_id": space.id,
+                    "space_name": space.name,
+                    "index": idx,
+                    "total": room_count,
+                })
+
+                try:
+                    items = await run_room_takeoff(
+                        content_parts=content_parts,
+                        space_name=space.name,
+                        space_type=space.type.value,
+                        scale=scale,
+                    )
+                    all_items.extend(items)
+
+                    yield StreamService.format_sse("room_items", {
+                        "space_id": space.id,
+                        "space_name": space.name,
+                        "items": [item.model_dump() for item in items],
+                    })
+                except Exception as e:
+                    logger.warning(f"Room takeoff failed for {space.name}: {e}")
+                    yield StreamService.format_sse("room_items", {
+                        "space_id": space.id,
+                        "space_name": space.name,
+                        "items": [],
+                        "error": str(e),
+                    })
+
+            yield StreamService.format_sse("phase_complete", {"phase": 3})
+
+            # ── Complete ──
+            summary: dict[str, float] = {}
+            for item in all_items:
+                cat = item.category.value if hasattr(item.category, "value") else item.category
+                key = f"total_{cat}"
+                summary[key] = summary.get(key, 0) + item.quantity
+
+            yield StreamService.complete_event({
+                "total_items": len(all_items),
+                "summary": summary,
+                "scale_used": scale,
+                "available_trades": AVAILABLE_TRADES,
+            })
+
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP error in pipeline: {e}")
+            yield StreamService.error_event("Failed to fetch blueprint")
+        except Exception as e:
+            logger.exception("Pipeline failed")
+            yield StreamService.error_event(str(e))
+
+    return EventSourceResponse(generate())
+
+
+@router.post("/trade-deepdive")
+async def trade_deepdive(request: TradeDeepDiveRequest):
+    """Run a trade-specific deep-dive analysis via SSE.
+
+    SSE Events:
+    - trade_start: { trade }
+    - trade_result: { TradeAnalysis }
+    - trade_complete: { trade, item_count }
+    - error: { code, message }
+    """
+
+    if request.trade not in AVAILABLE_TRADES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown trade '{request.trade}'. Must be one of: {AVAILABLE_TRADES}",
+        )
+
+    async def generate():
+        try:
+            yield StreamService.format_sse("trade_start", {"trade": request.trade})
+
+            file_bytes = await FileService.fetch_file(request.blueprint_url)
+            content_parts = FileService.to_content_parts(file_bytes)
+
+            result = await run_trade_analysis(
+                content_parts=content_parts,
+                trade=request.trade,
+                spaces_summary=request.spaces_summary,
+                scale=request.scale,
+            )
+
+            yield StreamService.format_sse("trade_result", result.model_dump())
+            yield StreamService.format_sse("trade_complete", {
+                "trade": request.trade,
+                "item_count": len(result.items),
+            })
+
+        except Exception as e:
+            logger.exception(f"Trade deep-dive failed for {request.trade}")
+            yield StreamService.error_event(str(e))
+
+    return EventSourceResponse(generate())

@@ -1,34 +1,10 @@
-import os
-from dataclasses import dataclass
+from google.genai import types
 
-from pydantic_ai import Agent, RunContext
-from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openai import OpenAIProvider
-
-from python_api.models import TakeoffResult, TakeoffItem, MeasurementCategory
+from python_api.models import TakeoffResult, TakeoffItem
+from python_api.agents.gemini_utils import get_client, get_schema
 
 
-@dataclass
-class TakeoffDeps:
-    """Dependencies for the takeoff agent."""
-    project_id: str
-    blueprint_data: bytes  # Raw PDF or image bytes
-    scale: str | None = None
-    focus_areas: list[str] | None = None
-
-
-# Use Gemini via OpenAI-compatible endpoint (lighter SDK)
-_provider = OpenAIProvider(
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
-    api_key=os.environ.get("GOOGLE_API_KEY", ""),
-)
-gemini_model = OpenAIModel("gemini-2.0-flash", provider=_provider)
-
-takeoff_agent = Agent(
-    gemini_model,
-    deps_type=TakeoffDeps,
-    output_type=TakeoffResult,
-    instructions="""You are an expert construction estimator analyzing architectural blueprints.
+TAKEOFF_INSTRUCTIONS = """You are an expert construction estimator analyzing architectural blueprints.
 
 Your task is to perform a quantity takeoff - extracting all measurable items from the blueprint.
 
@@ -68,39 +44,126 @@ Common scales:
 - Be accurate - use the scale correctly
 - Be organized - group by category and type
 - Be honest - use lower confidence for unclear items
-""",
-)
+"""
+
+ROOM_TAKEOFF_INSTRUCTIONS = """You are an expert construction estimator analyzing architectural blueprints.
+
+Your task is to extract all measurable items from ONE SPECIFIC ROOM/SPACE in the blueprint.
+
+## Target Space
+
+Focus ONLY on the room/space specified in the prompt. Do not include items from other spaces.
+
+## Measurement Categories
+
+1. **COUNT** - Individual items (doors, windows, fixtures, outlets, switches)
+   - Units: ea (each), pcs (pieces)
+
+2. **LINEAR** - Length measurements (walls, baseboards, crown molding, pipes)
+   - Units: LF (linear feet), m (meters)
+
+3. **AREA** - Surface measurements (floor area, wall area, ceiling)
+   - Units: SF (square feet), m² (square meters)
+
+4. **VOLUME** - Cubic measurements (concrete, excavation)
+   - Units: CF (cubic feet), CY (cubic yards)
+
+## Instructions
+
+1. Locate the specified room/space on the blueprint
+2. Extract EVERY measurable item within that space
+3. Include wall lengths, floor area, and ceiling area
+4. Count all doors, windows, outlets, switches, and fixtures
+5. Note any special features (built-ins, niches, soffits)
+6. Use the provided scale for accurate measurements
+
+## Output Requirements
+
+- Be exhaustive within the target room
+- Set location to the room name for all items
+- Use lower confidence for items at room boundaries
+"""
 
 
-@takeoff_agent.tool
-async def get_scale(ctx: RunContext[TakeoffDeps]) -> str:
-    """Get the scale to use for measurements."""
-    if ctx.deps.scale:
-        return f"Use scale: {ctx.deps.scale}"
-    return "No scale provided. Estimate dimensions based on standard construction elements (doors are typically 3' wide, 6'8\" tall)."
+async def run_takeoff(
+    content_parts: list[types.Part],
+    scale: str | None = None,
+    focus_areas: list[str] | None = None,
+) -> TakeoffResult:
+    """Run takeoff analysis on blueprint images."""
+
+    # Build prompt with context
+    prompt_parts = ["Analyze this blueprint and perform a complete quantity takeoff."]
+
+    if scale:
+        prompt_parts.append(f"\nScale to use: {scale}")
+    else:
+        prompt_parts.append(
+            "\nNo scale provided. Estimate dimensions based on standard "
+            "construction elements (doors are typically 3' wide, 6'8\" tall)."
+        )
+
+    if focus_areas:
+        prompt_parts.append(f"\nFocus on these elements: {', '.join(focus_areas)}")
+
+    prompt = "\n".join(prompt_parts)
+
+    response = await get_client().aio.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[prompt, *content_parts],
+        config=types.GenerateContentConfig(
+            system_instruction=TAKEOFF_INSTRUCTIONS,
+            response_mime_type="application/json",
+            response_schema=get_schema(TakeoffResult),
+        ),
+    )
+
+    return TakeoffResult.model_validate_json(response.text)
 
 
-@takeoff_agent.tool
-async def get_focus_areas(ctx: RunContext[TakeoffDeps]) -> str:
-    """Get any specific areas to focus on."""
-    if ctx.deps.focus_areas:
-        return f"Focus on these elements: {', '.join(ctx.deps.focus_areas)}"
-    return "Analyze all visible construction elements."
+async def run_room_takeoff(
+    content_parts: list[types.Part],
+    space_name: str,
+    space_type: str,
+    scale: str | None = None,
+) -> list[TakeoffItem]:
+    """Run takeoff extraction for a single room/space.
 
+    Returns a list of TakeoffItems found in the specified room.
+    """
+    from pydantic import BaseModel, Field
 
-@takeoff_agent.tool_plain
-def calculate_area(length: float, width: float) -> float:
-    """Calculate area from length and width."""
-    return round(length * width, 2)
+    class RoomItems(BaseModel):
+        items: list[TakeoffItem] = Field(default_factory=list)
 
+    prompt_parts = [
+        f'Extract all measurable items from the room/space named "{space_name}" (type: {space_type}).',
+        "Focus ONLY on this specific space. Do not include items from other rooms.",
+    ]
 
-@takeoff_agent.tool_plain
-def calculate_linear_total(segments: list[float]) -> float:
-    """Calculate total linear measurement from segments."""
-    return round(sum(segments), 2)
+    if scale:
+        prompt_parts.append(f"\nScale to use: {scale}")
+    else:
+        prompt_parts.append(
+            "\nNo scale provided. Estimate dimensions based on standard "
+            "construction elements."
+        )
 
+    prompt = "\n".join(prompt_parts)
 
-@takeoff_agent.tool_plain
-def calculate_volume(length: float, width: float, depth: float) -> float:
-    """Calculate volume from dimensions."""
-    return round(length * width * depth, 2)
+    response = await get_client().aio.models.generate_content(
+        model="gemini-2.0-flash",
+        contents=[prompt, *content_parts],
+        config=types.GenerateContentConfig(
+            system_instruction=ROOM_TAKEOFF_INSTRUCTIONS,
+            response_mime_type="application/json",
+            response_schema=get_schema(RoomItems),
+        ),
+    )
+
+    result = RoomItems.model_validate_json(response.text)
+    # Ensure location is set for all items
+    for item in result.items:
+        if not item.location:
+            item.location = space_name
+    return result.items

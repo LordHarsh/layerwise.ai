@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { UserButton, useAuth } from "@clerk/nextjs";
 import {
@@ -9,19 +9,25 @@ import {
   Download,
   RotateCcw,
   FileSearch,
-  CheckCircle2,
   Loader2,
   ChevronRight,
-  Ruler,
-  Sparkles,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 
-import { UploadZone, ResultsTable, ProgressBar, ScaleInput } from "@/components/takeoff";
-import { useTakeoffStream } from "@/hooks/use-takeoff-stream";
+import {
+  UploadZone,
+  ScaleInput,
+  PhaseTracker,
+  DocIntelligenceCard,
+  SpaceList,
+  TradeButtons,
+  GroupedResultsTable,
+} from "@/components/takeoff";
+import { usePipelineStream } from "@/hooks/use-pipeline-stream";
+import { useTradeDeepDive } from "@/hooks/use-trade-deepdive";
+import type { TradeAnalysis } from "@/types";
 
 export default function TakeoffPage() {
   const { userId } = useAuth();
@@ -30,16 +36,8 @@ export default function TakeoffPage() {
   const [blueprintName, setBlueprintName] = useState<string | null>(null);
   const [scale, setScale] = useState<string>("");
 
-  const {
-    status,
-    progress,
-    scale: detectedScale,
-    items,
-    summary,
-    error,
-    startTakeoff,
-    reset,
-  } = useTakeoffStream();
+  const pipeline = usePipelineStream();
+  const tradeDeepDive = useTradeDeepDive();
 
   const handleUploadComplete = useCallback((url: string, filename: string) => {
     setBlueprintUrl(url);
@@ -48,23 +46,71 @@ export default function TakeoffPage() {
 
   const handleStartAnalysis = useCallback(() => {
     if (!blueprintUrl) return;
-    startTakeoff(blueprintUrl, scale || undefined);
-  }, [blueprintUrl, scale, startTakeoff]);
+    pipeline.startPipeline(blueprintUrl, scale || undefined);
+  }, [blueprintUrl, scale, pipeline]);
 
   const handleReset = useCallback(() => {
-    reset();
+    pipeline.reset();
+    tradeDeepDive.resetAll();
     setBlueprintUrl(null);
     setBlueprintName(null);
     setScale("");
     setProjectId(crypto.randomUUID());
-  }, [reset]);
+  }, [pipeline, tradeDeepDive]);
+
+  const handleTradeClick = useCallback(
+    (trade: string) => {
+      if (!blueprintUrl) return;
+      const tradeState = tradeDeepDive.getTradeState(trade);
+      // Don't re-run if already loading or complete
+      if (tradeState.status === "loading" || tradeState.status === "complete") return;
+
+      const detectedScale = pipeline.docIntelligence?.scale?.scale_string;
+      tradeDeepDive.startDeepDive(
+        blueprintUrl,
+        trade,
+        pipeline.spaces,
+        scale || detectedScale || undefined
+      );
+    },
+    [blueprintUrl, scale, pipeline.docIntelligence, pipeline.spaces, tradeDeepDive]
+  );
+
+  const getTradeStatus = useCallback(
+    (trade: string) => tradeDeepDive.getTradeState(trade).status,
+    [tradeDeepDive]
+  );
+
+  const getTradeItemCount = useCallback(
+    (trade: string) => tradeDeepDive.getTradeState(trade).result?.items.length ?? 0,
+    [tradeDeepDive]
+  );
+
+  // Build trade results map for the grouped table
+  const tradeResultsMap = useMemo(() => {
+    const map = new Map<string, TradeAnalysis>();
+    tradeDeepDive.results.forEach((state, trade) => {
+      if (state.result) {
+        map.set(trade, state.result);
+      }
+    });
+    return map;
+  }, [tradeDeepDive.results]);
 
   const handleExportCSV = useCallback(() => {
-    if (items.length === 0) return;
+    const allItems = pipeline.allItems;
+    // Also include trade deep-dive items
+    tradeDeepDive.results.forEach((state) => {
+      if (state.result) {
+        allItems.push(...state.result.items);
+      }
+    });
+
+    if (allItems.length === 0) return;
 
     const headers = ["Name", "Category", "Quantity", "Unit", "Location", "Confidence"];
-    const rows = items.map((item) => [
-      item.name,
+    const rows = allItems.map((item) => [
+      `"${item.name.replace(/"/g, '""')}"`,
       item.category,
       item.quantity.toString(),
       item.unit,
@@ -82,14 +128,26 @@ export default function TakeoffPage() {
     a.click();
 
     URL.revokeObjectURL(url);
-  }, [items, blueprintName]);
+  }, [pipeline.allItems, tradeDeepDive.results, blueprintName]);
 
-  const isAnalyzing = status === "connecting" || status === "streaming";
-  const hasResults = items.length > 0;
+  const isAnalyzing =
+    pipeline.status === "connecting" ||
+    pipeline.status === "phase-1" ||
+    pipeline.status === "phase-2" ||
+    pipeline.status === "phase-3";
+  const hasResults = pipeline.allItems.length > 0;
+  const hasTradeResults = tradeResultsMap.size > 0;
 
-  const step1Complete = !!blueprintUrl;
-  const step2Active = step1Complete;
-  const step3Active = step1Complete;
+  // Detect scale from pipeline or manual input
+  const detectedScaleEvent =
+    pipeline.docIntelligence?.scale
+      ? {
+          detected: true,
+          scale: pipeline.docIntelligence.scale.scale_string,
+          confidence: pipeline.docIntelligence.scale.confidence,
+          reasoning: "",
+        }
+      : null;
 
   return (
     <div className="earth-linen-bg min-h-screen">
@@ -105,7 +163,6 @@ export default function TakeoffPage() {
                 Layerwise
               </span>
             </Link>
-            {/* Breadcrumb */}
             <div className="ml-2 flex items-center gap-1">
               <ChevronRight className="size-4 text-[#a8a29e]" />
               <Link
@@ -120,10 +177,18 @@ export default function TakeoffPage() {
               </span>
             </div>
           </div>
+
+          {/* Phase tracker in header when analyzing */}
+          {pipeline.status !== "idle" && (
+            <div className="hidden md:block">
+              <PhaseTracker
+                status={pipeline.status}
+                hasTradeResults={hasTradeResults}
+              />
+            </div>
+          )}
+
           <div className="flex items-center gap-3">
-            <span className="hidden text-sm font-medium text-[#78716c] sm:block">
-              New Takeoff
-            </span>
             <UserButton afterSignOutUrl="/" />
           </div>
         </div>
@@ -131,24 +196,12 @@ export default function TakeoffPage() {
 
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-6 py-8">
-        <div className="grid gap-8 lg:grid-cols-[360px_1fr]">
-          {/* Left column - Configuration */}
+        <div className="grid gap-8 lg:grid-cols-[340px_1fr]">
+          {/* ── Left Panel ── */}
           <div className="space-y-5">
-            {/* Step 1: Upload */}
-            <div
-              className="earth-shadow-sm earth-fade-up rounded-2xl border border-[#e2d5c3] bg-white p-6"
-            >
-              <div className="mb-4 flex items-center gap-3">
-                <StepIndicator step={1} complete={step1Complete} active={!step1Complete} />
-                <div>
-                  <h3 className="earth-serif text-sm font-semibold text-[#292018]">
-                    Upload Blueprint
-                  </h3>
-                  <p className="text-xs text-[#a8a29e]">
-                    PDF or image up to 50MB
-                  </p>
-                </div>
-              </div>
+            {/* Upload */}
+            <div className="earth-shadow-sm earth-fade-up rounded-2xl border border-[#e2d5c3] bg-white p-5">
+              <SectionHeader title="Upload Blueprint" subtitle="PDF or image up to 50MB" />
               <UploadZone
                 onUploadComplete={handleUploadComplete}
                 disabled={isAnalyzing}
@@ -157,57 +210,27 @@ export default function TakeoffPage() {
               />
             </div>
 
-            {/* Step 2: Scale */}
+            {/* Scale */}
             <div
-              className={`earth-shadow-sm earth-fade-up earth-fade-up-delay-1 rounded-2xl border border-[#e2d5c3] bg-white p-6 ${
-                !step2Active ? "pointer-events-none opacity-50" : ""
+              className={`earth-shadow-sm earth-fade-up earth-fade-up-delay-1 rounded-2xl border border-[#e2d5c3] bg-white p-5 ${
+                !blueprintUrl ? "pointer-events-none opacity-50" : ""
               }`}
             >
-              <div className="mb-4 flex items-center gap-3">
-                <StepIndicator step={2} complete={false} active={step2Active} />
-                <div>
-                  <h3 className="earth-serif text-sm font-semibold text-[#292018]">
-                    Set Scale
-                  </h3>
-                  <p className="text-xs text-[#a8a29e]">
-                    Select or auto-detect scale
-                  </p>
-                </div>
-              </div>
+              <SectionHeader title="Scale" subtitle="Select or auto-detect" />
               <ScaleInput
-                detectedScale={detectedScale}
+                detectedScale={detectedScaleEvent}
                 value={scale}
                 onChange={setScale}
-                disabled={isAnalyzing || !step2Active}
+                disabled={isAnalyzing || !blueprintUrl}
               />
             </div>
 
-            {/* Step 3: Analyze */}
+            {/* Analyze button */}
             <div
-              className={`earth-shadow-sm earth-fade-up earth-fade-up-delay-2 rounded-2xl border border-[#e2d5c3] bg-white p-6 ${
-                !step3Active ? "pointer-events-none opacity-50" : ""
+              className={`earth-shadow-sm earth-fade-up earth-fade-up-delay-2 rounded-2xl border border-[#e2d5c3] bg-white p-5 ${
+                !blueprintUrl ? "pointer-events-none opacity-50" : ""
               }`}
             >
-              <div className="mb-4 flex items-center gap-3">
-                <StepIndicator
-                  step={3}
-                  complete={status === "complete"}
-                  active={step3Active}
-                  loading={isAnalyzing}
-                />
-                <div>
-                  <h3 className="earth-serif text-sm font-semibold text-[#292018]">
-                    Run Analysis
-                  </h3>
-                  <p className="text-xs text-[#a8a29e]">
-                    {isAnalyzing
-                      ? "Analyzing blueprint..."
-                      : status === "complete"
-                        ? "Analysis complete"
-                        : "Extract quantities & measurements"}
-                  </p>
-                </div>
-              </div>
               <div className="flex gap-2">
                 <Button
                   onClick={handleStartAnalysis}
@@ -227,7 +250,7 @@ export default function TakeoffPage() {
                   )}
                 </Button>
 
-                {(hasResults || status === "error") && (
+                {(hasResults || pipeline.status === "error") && (
                   <Button variant="outline" onClick={handleReset} className="rounded-full">
                     <RotateCcw className="size-4" />
                     Reset
@@ -235,16 +258,77 @@ export default function TakeoffPage() {
                 )}
               </div>
 
-              {/* Progress */}
-              {(isAnalyzing || status === "complete") && (
-                <div className="mt-4">
-                  <ProgressBar progress={progress} status={status} />
+              {/* Phase progress for mobile */}
+              {pipeline.status !== "idle" && (
+                <div className="mt-3 md:hidden">
+                  <PhaseTracker
+                    status={pipeline.status}
+                    hasTradeResults={hasTradeResults}
+                  />
                 </div>
               )}
             </div>
+
+            {/* Doc Intelligence Card (after Phase 1) */}
+            {pipeline.docIntelligence && (
+              <div className="earth-shadow-sm earth-fade-up rounded-2xl border border-[#e2d5c3] bg-white p-5">
+                <SectionHeader
+                  title="Document Info"
+                  subtitle="AI analysis"
+                />
+                <DocIntelligenceCard data={pipeline.docIntelligence} />
+              </div>
+            )}
+
+            {/* Space List (after Phase 2) */}
+            {pipeline.spaces.length > 0 && (
+              <div className="earth-shadow-sm earth-fade-up rounded-2xl border border-[#e2d5c3] bg-white p-5">
+                <SectionHeader
+                  title="Detected Spaces"
+                  subtitle={`${pipeline.spaces.length} rooms/areas`}
+                />
+                <SpaceList
+                  spaces={pipeline.spaces}
+                  roomResults={pipeline.roomResults}
+                  currentRoom={pipeline.currentRoom}
+                  totalArea={
+                    pipeline.spaces.reduce(
+                      (sum, s) => sum + (s.area_estimate || 0),
+                      0
+                    ) || null
+                  }
+                />
+              </div>
+            )}
+
+            {/* Trade Buttons (after Phase 3) */}
+            {pipeline.availableTrades.length > 0 && pipeline.status === "complete" && (
+              <div className="earth-shadow-sm earth-fade-up rounded-2xl border border-[#e2d5c3] bg-white p-5">
+                <TradeButtons
+                  availableTrades={pipeline.availableTrades}
+                  getTradeStatus={getTradeStatus}
+                  getTradeItemCount={getTradeItemCount}
+                  onTradeClick={handleTradeClick}
+                />
+              </div>
+            )}
+
+            {/* Export CSV */}
+            {hasResults && pipeline.status === "complete" && (
+              <div className="earth-fade-up">
+                <Button
+                  variant="outline"
+                  onClick={handleExportCSV}
+                  className="w-full rounded-full"
+                >
+                  <Download className="size-4" />
+                  Export CSV
+                </Button>
+              </div>
+            )}
           </div>
 
-          {/* Right column - Results */}
+          {/* ── Right Panel ── */}
           <div className="space-y-5">
             <div className="earth-shadow earth-fade-up earth-fade-up-delay-1 overflow-hidden rounded-2xl border border-[#e2d5c3] bg-white">
               {/* Results Header */}
@@ -263,99 +347,71 @@ export default function TakeoffPage() {
                   </div>
                 </div>
 
-                {hasResults && status === "complete" && (
-                  <button
-                    onClick={handleExportCSV}
-                    className="earth-btn-outline flex items-center gap-2 !px-5 !py-2 text-sm"
-                  >
-                    <Download className="size-4" />
-                    Export CSV
-                  </button>
+                {hasResults && pipeline.status === "complete" && (
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-[#f3ece1] text-xs text-[#78716c]">
+                      {pipeline.allItems.length} items
+                    </Badge>
+                  </div>
                 )}
               </div>
 
               <div className="p-6">
-                {/* Error message */}
-                {error && (
+                {/* Error */}
+                {pipeline.error && (
                   <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3">
                     <div className="mt-0.5 size-2 shrink-0 rounded-full bg-red-500" />
-                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-sm text-red-700">{pipeline.error}</p>
                   </div>
                 )}
 
-                {/* Scale detection result */}
-                {detectedScale && !scale && (
-                  <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3">
-                    <div className="mt-0.5 size-2 shrink-0 rounded-full bg-blue-500" />
-                    <div>
-                      <p className="text-sm text-blue-900">
-                        {detectedScale.detected ? (
-                          <>
-                            Scale detected: <strong>{detectedScale.scale}</strong>
-                            {" "}
-                            <Badge variant="secondary" className="ml-1 text-xs">
-                              {Math.round((detectedScale.confidence || 0) * 100)}% confident
-                            </Badge>
-                          </>
-                        ) : (
-                          <>Scale could not be auto-detected. Please set manually.</>
-                        )}
-                      </p>
-                      {detectedScale.reasoning && (
-                        <p className="mt-1 text-xs text-blue-700">
-                          {detectedScale.reasoning}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
+                {/* Grouped results */}
+                <GroupedResultsTable
+                  roomResults={pipeline.roomResults}
+                  tradeResults={tradeResultsMap}
+                  isStreaming={isAnalyzing}
+                  currentRoom={pipeline.currentRoom}
+                />
 
-                {/* Results table */}
-                <ResultsTable items={items} isStreaming={isAnalyzing} />
-
-                {/* Summary */}
-                {summary && status === "complete" && (
-                  <>
-                    <div className="my-6">
-                      <div className="earth-divider">
-                        <div className="earth-divider-diamond" />
-                      </div>
+                {/* Summary after completion */}
+                {pipeline.summary && pipeline.status === "complete" && (
+                  <div className="mt-6">
+                    <div className="earth-divider">
+                      <div className="earth-divider-diamond" />
                     </div>
-                    <div>
+                    <div className="mt-6">
                       <h3 className="earth-serif mb-3 text-sm font-semibold text-[#292018]">
                         Summary
                       </h3>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <SummaryCard label="Total Items" value={summary.total_items} />
-                        {Object.entries(summary.summary || {}).slice(0, 3).map(([key, value]) => (
+                        <SummaryCard
+                          label="Total Items"
+                          value={pipeline.summary.total_items}
+                        />
+                        <SummaryCard
+                          label="Rooms Scanned"
+                          value={pipeline.roomResults.size}
+                        />
+                        {pipeline.summary.scale_used && (
                           <SummaryCard
-                            key={key}
-                            label={key}
-                            value={typeof value === "number" ? value : 0}
+                            label="Scale"
+                            value={pipeline.summary.scale_used}
+                            isText
                           />
-                        ))}
+                        )}
+                        {hasTradeResults && (
+                          <SummaryCard
+                            label="Trade Analyses"
+                            value={tradeResultsMap.size}
+                          />
+                        )}
                       </div>
-                      {summary.notes && summary.notes.length > 0 && (
-                        <div className="earth-parchment mt-4 rounded-xl p-4">
-                          <p className="earth-serif mb-1.5 text-xs font-semibold text-[#292018]">
-                            Notes
-                          </p>
-                          <ul className="space-y-1">
-                            {summary.notes.map((note, i) => (
-                              <li key={i} className="flex items-start gap-2 text-xs text-[#78716c]">
-                                <span className="text-[#c2410c]">&bull;</span>
-                                {note}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {/* Empty state */}
-                {!hasResults && status === "idle" && (
+                {!hasResults && !isAnalyzing && pipeline.status === "idle" && (
                   <div className="flex flex-col items-center justify-center py-20">
                     <div className="flex size-16 items-center justify-center rounded-2xl bg-[rgba(194,65,12,0.08)]">
                       <FileSearch className="size-7 text-[#c2410c]" />
@@ -364,7 +420,8 @@ export default function TakeoffPage() {
                       No results yet
                     </p>
                     <p className="mt-1.5 max-w-xs text-center text-sm text-[#a8a29e]">
-                      Upload a blueprint, set the scale, and click &quot;Start Takeoff&quot; to extract quantities.
+                      Upload a blueprint, set the scale, and click &quot;Start
+                      Takeoff&quot; to run the multi-phase analysis pipeline.
                     </p>
                   </div>
                 )}
@@ -379,53 +436,32 @@ export default function TakeoffPage() {
 
 /* ── Sub-components ── */
 
-function StepIndicator({
-  step,
-  complete,
-  active,
-  loading,
-}: {
-  step: number;
-  complete: boolean;
-  active: boolean;
-  loading?: boolean;
-}) {
-  if (loading) {
-    return (
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-[#c2410c] bg-[rgba(194,65,12,0.1)]">
-        <Loader2 className="size-4 animate-spin text-[#c2410c]" />
-      </div>
-    );
-  }
-
-  if (complete) {
-    return (
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#166534]">
-        <CheckCircle2 className="size-4 text-white" />
-      </div>
-    );
-  }
-
-  if (active) {
-    return (
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-[#c2410c] bg-[rgba(194,65,12,0.1)]">
-        <span className="earth-serif text-xs font-bold text-[#c2410c]">{step}</span>
-      </div>
-    );
-  }
-
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-[#e2d5c3]">
-      <span className="earth-serif text-xs font-bold text-[#a8a29e]">{step}</span>
+    <div className="mb-3">
+      <h3 className="earth-serif text-sm font-semibold text-[#292018]">{title}</h3>
+      <p className="text-xs text-[#a8a29e]">{subtitle}</p>
     </div>
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: number }) {
+function SummaryCard({
+  label,
+  value,
+  isText,
+}: {
+  label: string;
+  value: number | string;
+  isText?: boolean;
+}) {
   return (
     <div className="earth-parchment rounded-xl border border-[#e2d5c3] p-3">
-      <p className="earth-serif text-2xl font-bold tabular-nums tracking-tight text-[#292018]">
-        {value.toLocaleString()}
+      <p
+        className={`font-medium tabular-nums text-[#292018] ${
+          isText ? "text-sm" : "earth-serif text-2xl tracking-tight"
+        }`}
+      >
+        {typeof value === "number" ? value.toLocaleString() : value}
       </p>
       <p className="text-xs text-[#78716c]">{label}</p>
     </div>
