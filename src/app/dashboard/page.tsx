@@ -2,156 +2,192 @@ import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import {
+  Layers,
+  Plus,
+  Upload,
+  FolderOpen,
+  ClipboardList,
+  Search,
+  Clock,
+  ArrowRight,
+} from "lucide-react";
 
 export default async function DashboardPage() {
   const user = await currentUser();
+  if (!user) redirect("/sign-in");
 
-  if (!user) {
-    redirect("/sign-in");
-  }
+  const firstName = user.firstName || "there";
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="earth-linen-bg min-h-screen">
       {/* Header */}
-      <header className="border-b border-neutral-100">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-8">
-            <Link href="/dashboard" className="text-lg font-semibold text-neutral-900">
+      <header className="sticky top-0 z-30 border-b border-[#e2d5c3] bg-[#faf7f2]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <Link href="/dashboard" className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-[#c2410c]">
+              <Layers className="size-5 text-white" />
+            </div>
+            <span className="earth-serif text-xl font-bold text-[#292018]">
               Layerwise
+            </span>
+          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/takeoff"
+              className="text-sm text-[#78716c] transition-colors hover:opacity-70"
+            >
+              Takeoff
             </Link>
-            <nav className="hidden items-center gap-6 md:flex">
-              <Link
-                href="/dashboard"
-                className="text-sm font-medium text-neutral-900"
-              >
-                Dashboard
-              </Link>
-              <Link
-                href="/projects"
-                className="text-sm text-neutral-500 transition-colors hover:text-neutral-900"
-              >
-                Projects
-              </Link>
-            </nav>
+            <UserButton afterSignOutUrl="/" />
           </div>
-          <UserButton afterSignOutUrl="/" />
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="mx-auto max-w-6xl px-6 py-12">
-        {/* Welcome */}
-        <div className="mb-12">
-          <h1 className="text-2xl font-semibold text-neutral-900">
-            Welcome back, {user.firstName || "there"}
+      {/* Main Content */}
+      <main className="mx-auto max-w-7xl px-6 py-10">
+        {/* Greeting */}
+        <div className="earth-fade-up mb-10">
+          <h1 className="earth-serif text-3xl font-bold text-[#292018]">
+            Welcome back, {firstName}
           </h1>
-          <p className="mt-1 text-neutral-500">
-            Start a new takeoff or continue where you left off.
+          <p className="mt-2 text-base text-[#78716c]">
+            Ready to start your next takeoff?
           </p>
         </div>
 
-        {/* Upload Area */}
-        <Link
-          href="/takeoff"
-          className="group mb-12 flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50/50 px-6 py-16 transition-all hover:border-neutral-300 hover:bg-neutral-50"
-        >
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-neutral-200 bg-white transition-colors group-hover:border-neutral-300">
-            <svg
-              className="h-5 w-5 text-neutral-400 transition-colors group-hover:text-neutral-600"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M12 4.5v15m7.5-7.5h-15"
-              />
-            </svg>
-          </div>
-          <span className="text-sm font-medium text-neutral-700">
-            New Takeoff
-          </span>
-          <span className="mt-1 text-xs text-neutral-400">
-            Upload PDF or image to analyze
-          </span>
-        </Link>
-
-        {/* Recent Projects */}
-        <section>
-          <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-neutral-900">Recent Projects</h2>
-            <Link
-              href="/projects"
-              className="text-xs text-neutral-400 transition-colors hover:text-neutral-600"
-            >
-              View all
-            </Link>
-          </div>
-
-          {/* Empty state */}
-          <div className="rounded-xl border border-neutral-100 bg-neutral-50/30">
-            <div className="flex flex-col items-center justify-center py-16">
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100">
-                <svg
-                  className="h-5 w-5 text-neutral-400"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-                  />
-                </svg>
+        {/* Start New Takeoff Card */}
+        <div className="earth-fade-up earth-fade-up-delay-1 mb-10">
+          <div className="earth-shadow-lg earth-parchment earth-hover-lift overflow-hidden rounded-3xl border border-[#e2d5c3] p-10">
+            <div className="flex flex-col items-start gap-8 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-5">
+                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-[rgba(194,65,12,0.1)]">
+                  <Plus className="size-7 text-[#c2410c]" />
+                </div>
+                <div>
+                  <h2 className="earth-serif text-2xl font-semibold text-[#292018]">
+                    Start a new takeoff
+                  </h2>
+                  <p className="mt-1 max-w-md leading-relaxed text-[#78716c]">
+                    Upload a blueprint PDF and let our AI extract precise
+                    quantities, measurements, and material counts.
+                  </p>
+                </div>
               </div>
-              <p className="text-sm text-neutral-500">No projects yet</p>
-              <p className="mt-1 text-xs text-neutral-400">
-                Your takeoff results will appear here
-              </p>
+              <Link href="/takeoff">
+                <span className="earth-btn-primary flex items-center gap-2 whitespace-nowrap">
+                  <Upload className="size-4" />
+                  Upload Blueprint
+                </span>
+              </Link>
             </div>
           </div>
-        </section>
+        </div>
 
-        {/* Quick Info */}
-        <section className="mt-12 grid gap-px overflow-hidden rounded-xl border border-neutral-100 bg-neutral-100 md:grid-cols-4">
-          <div className="bg-white p-6">
-            <div className="text-xs font-medium uppercase tracking-wider text-neutral-400">
-              Count
+        {/* Stats Grid */}
+        <div className="earth-fade-up earth-fade-up-delay-2 mb-10 grid gap-6 sm:grid-cols-3">
+          {statCards.map((stat, i) => (
+            <div
+              key={i}
+              className="earth-shadow-sm earth-hover-lift rounded-2xl border border-[#e2d5c3] bg-white p-6"
+            >
+              <div className="flex items-center gap-4">
+                <div
+                  className="flex size-11 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: stat.bgColor }}
+                >
+                  <stat.icon className="size-5" style={{ color: stat.color }} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-[#78716c]">
+                    {stat.label}
+                  </p>
+                  <p className="earth-serif text-2xl font-bold text-[#292018]">
+                    {stat.value}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="mt-1 text-sm text-neutral-600">
-              Doors, windows, fixtures
+          ))}
+        </div>
+
+        {/* Decorative Divider */}
+        <div className="earth-fade-up earth-fade-up-delay-2 mb-10">
+          <div className="earth-divider">
+            <div className="earth-divider-diamond" />
+          </div>
+        </div>
+
+        {/* Recent Work */}
+        <div className="earth-fade-up earth-fade-up-delay-3">
+          <h2 className="earth-serif mb-6 text-xl font-semibold text-[#292018]">
+            Recent Work
+          </h2>
+          <div className="earth-shadow rounded-2xl border border-[#e2d5c3] bg-white">
+            <div className="flex flex-col items-center justify-center px-6 py-20">
+              <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-[rgba(194,65,12,0.06)]">
+                <FolderOpen className="size-10 text-[#c2410c]" />
+              </div>
+              <p className="earth-serif text-xl italic text-[#78716c]">
+                Your work will appear here
+              </p>
+              <p className="mt-2 max-w-sm text-center text-sm text-[#a8a29e]">
+                Once you complete your first takeoff, your projects and results
+                will be listed in this section.
+              </p>
+              <Link href="/takeoff">
+                <span className="earth-btn-primary mt-8 inline-flex items-center gap-2 text-sm !px-6 !py-2.5">
+                  Start Your First Takeoff
+                  <ArrowRight className="size-4" />
+                </span>
+              </Link>
             </div>
           </div>
-          <div className="bg-white p-6">
-            <div className="text-xs font-medium uppercase tracking-wider text-neutral-400">
-              Linear
-            </div>
-            <div className="mt-1 text-sm text-neutral-600">
-              Walls, pipes, wiring
-            </div>
-          </div>
-          <div className="bg-white p-6">
-            <div className="text-xs font-medium uppercase tracking-wider text-neutral-400">
-              Area
-            </div>
-            <div className="mt-1 text-sm text-neutral-600">
-              Floors, roofing, paint
-            </div>
-          </div>
-          <div className="bg-white p-6">
-            <div className="text-xs font-medium uppercase tracking-wider text-neutral-400">
-              Volume
-            </div>
-            <div className="mt-1 text-sm text-neutral-600">
-              Concrete, excavation
-            </div>
-          </div>
-        </section>
+        </div>
       </main>
+
+      {/* Footer */}
+      <footer className="mt-16 border-t border-[#e2d5c3]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
+          <div className="flex items-center gap-2">
+            <div className="flex size-6 items-center justify-center rounded-md bg-[#c2410c]">
+              <Layers className="size-3 text-white" />
+            </div>
+            <span className="earth-serif text-sm font-semibold text-[#292018]">
+              Layerwise
+            </span>
+          </div>
+          <p className="text-xs text-[#a8a29e]">
+            &copy; {new Date().getFullYear()} Layerwise
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
+
+/* ── Data ── */
+
+const statCards = [
+  {
+    icon: ClipboardList,
+    label: "Projects",
+    value: "0",
+    color: "#c2410c",
+    bgColor: "rgba(194, 65, 12, 0.08)",
+  },
+  {
+    icon: Search,
+    label: "Items Found",
+    value: "0",
+    color: "#166534",
+    bgColor: "rgba(22, 101, 52, 0.08)",
+  },
+  {
+    icon: Clock,
+    label: "Hours Saved",
+    value: "0",
+    color: "#92400e",
+    bgColor: "rgba(146, 64, 14, 0.08)",
+  },
+];

@@ -19,10 +19,10 @@ interface ResultsTableProps {
 }
 
 const categoryConfig: Record<MeasurementCategory, { label: string; className: string }> = {
-  count: { label: "Count", className: "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" },
-  linear: { label: "Linear", className: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300" },
-  area: { label: "Area", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300" },
-  volume: { label: "Volume", className: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300" },
+  count: { label: "Count", className: "bg-orange-100 text-orange-800 dark:bg-orange-500/20 dark:text-orange-300" },
+  linear: { label: "Linear", className: "bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300" },
+  area: { label: "Area", className: "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300" },
+  volume: { label: "Volume", className: "bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-300" },
 };
 
 export function ResultsTable({ items, isStreaming }: ResultsTableProps) {
@@ -75,7 +75,7 @@ export function ResultsTable({ items, isStreaming }: ResultsTableProps) {
       </div>
 
       {/* Table */}
-      <div className="rounded-lg border">
+      <div className="rounded-xl border border-[#e2d5c3]">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -90,11 +90,11 @@ export function ResultsTable({ items, isStreaming }: ResultsTableProps) {
             {sortedItems.map((item, index) => (
               <TableRow
                 key={`${item.name}-${index}`}
-                className={
+                className={`${
                   isStreaming && index === sortedItems.length - 1
                     ? "animate-in fade-in-0 bg-primary/5"
                     : ""
-                }
+                } ${index % 2 === 0 ? "earth-table-row-even" : ""}`}
               >
                 <TableCell>
                   <div>
@@ -144,7 +144,7 @@ function ConfidenceBadge({ value }: { value: number }) {
 
   let className = "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300";
   if (percentage >= 80) {
-    className = "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300";
+    className = "bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300";
   } else if (percentage >= 60) {
     className = "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300";
   }
@@ -164,7 +164,7 @@ function ResultsTableSkeleton() {
         <Skeleton className="h-5 w-14 rounded-full" />
         <Skeleton className="h-5 w-12 rounded-full" />
       </div>
-      <div className="rounded-lg border">
+      <div className="rounded-xl border border-[#e2d5c3]">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">

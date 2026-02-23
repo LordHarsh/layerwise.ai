@@ -48,71 +48,71 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #faf7f2;
+  --foreground: #292018;
+  --card: #ffffff;
+  --card-foreground: #292018;
+  --popover: #ffffff;
+  --popover-foreground: #292018;
+  --primary: #c2410c;
+  --primary-foreground: #ffffff;
+  --secondary: #f3ece1;
+  --secondary-foreground: #292018;
+  --muted: #f3ece1;
+  --muted-foreground: #78716c;
+  --accent: #f3ece1;
+  --accent-foreground: #292018;
+  --destructive: #dc2626;
+  --border: #e2d5c3;
+  --input: #e2d5c3;
+  --ring: #c2410c;
+  --chart-1: #c2410c;
+  --chart-2: #166534;
+  --chart-3: #1d4ed8;
+  --chart-4: #92400e;
+  --chart-5: #7c3aed;
+  --sidebar: #faf7f2;
+  --sidebar-foreground: #292018;
+  --sidebar-primary: #c2410c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f3ece1;
+  --sidebar-accent-foreground: #292018;
+  --sidebar-border: #e2d5c3;
+  --sidebar-ring: #c2410c;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #1c1610;
+  --foreground: #f0ebe4;
+  --card: #251e16;
+  --card-foreground: #f0ebe4;
+  --popover: #251e16;
+  --popover-foreground: #f0ebe4;
+  --primary: #d4590f;
+  --primary-foreground: #1c1610;
+  --secondary: #2d2418;
+  --secondary-foreground: #e8dfd4;
+  --muted: #2d2418;
+  --muted-foreground: #9a9088;
+  --accent: #2d2418;
+  --accent-foreground: #e8dfd4;
+  --destructive: #ef4444;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #d4590f;
+  --chart-1: #d4590f;
+  --chart-2: #22c55e;
+  --chart-3: #3b82f6;
+  --chart-4: #f59e0b;
+  --chart-5: #a78bfa;
+  --sidebar: #1c1610;
+  --sidebar-foreground: #f0ebe4;
+  --sidebar-primary: #d4590f;
+  --sidebar-primary-foreground: #1c1610;
+  --sidebar-accent: #2d2418;
+  --sidebar-accent-foreground: #e8dfd4;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #d4590f;
 }
 
 @layer base {
@@ -122,4 +122,256 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── Earth & Craft Design System ── */
+
+/* Linen texture background */
+.earth-linen-bg {
+  background-color: #faf7f2;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.008) 2px,
+      rgba(0, 0, 0, 0.008) 4px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 0, 0, 0.006) 2px,
+      rgba(0, 0, 0, 0.006) 4px
+    );
+}
+
+/* Parchment card backgrounds */
+.earth-parchment {
+  background-color: #f3ece1;
+  background-image:
+    radial-gradient(
+      ellipse at 20% 50%,
+      rgba(255, 255, 255, 0.3) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse at 80% 20%,
+      rgba(194, 65, 12, 0.02) 0%,
+      transparent 50%
+    );
+}
+
+/* Warm shadows */
+.earth-shadow {
+  box-shadow:
+    0 4px 16px -2px rgba(41, 32, 24, 0.06),
+    0 16px 40px -4px rgba(41, 32, 24, 0.08);
+}
+
+.earth-shadow-lg {
+  box-shadow:
+    0 8px 24px -4px rgba(41, 32, 24, 0.08),
+    0 24px 56px -8px rgba(41, 32, 24, 0.12);
+}
+
+.earth-shadow-sm {
+  box-shadow:
+    0 2px 8px -1px rgba(41, 32, 24, 0.05),
+    0 6px 20px -2px rgba(41, 32, 24, 0.06);
+}
+
+/* Serif heading */
+.earth-serif {
+  font-family: Georgia, "Times New Roman", Times, serif;
+}
+
+/* Wavy underline decoration */
+.earth-wavy-underline {
+  text-decoration: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #c2410c;
+  text-underline-offset: 6px;
+  text-decoration-thickness: 1.5px;
+}
+
+/* Decorative horizontal rule with diamond */
+.earth-divider {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.earth-divider::before,
+.earth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #e2d5c3 20%,
+    #e2d5c3 80%,
+    transparent
+  );
+}
+
+.earth-divider-diamond {
+  width: 8px;
+  height: 8px;
+  background: #c2410c;
+  transform: rotate(45deg);
+  flex-shrink: 0;
+}
+
+/* Stamp / seal badge */
+.earth-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid currentColor;
+  border-radius: 9999px;
+  padding: 8px 16px;
+  font-family: Georgia, "Times New Roman", Times, serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  position: relative;
+}
+
+.earth-stamp::before {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1px solid currentColor;
+  border-radius: 9999px;
+  opacity: 0.4;
+}
+
+/* Organic hover transitions */
+.earth-hover-lift {
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.earth-hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow:
+    0 12px 32px -4px rgba(41, 32, 24, 0.1),
+    0 28px 64px -8px rgba(41, 32, 24, 0.14);
+}
+
+/* Category badge pills */
+.earth-badge-count {
+  background-color: rgba(194, 65, 12, 0.1);
+  color: #c2410c;
+}
+
+.earth-badge-linear {
+  background-color: rgba(29, 78, 216, 0.1);
+  color: #1d4ed8;
+}
+
+.earth-badge-area {
+  background-color: rgba(22, 101, 52, 0.1);
+  color: #166534;
+}
+
+.earth-badge-volume {
+  background-color: rgba(124, 58, 237, 0.1);
+  color: #7c3aed;
+}
+
+/* Terracotta gradient */
+.earth-gradient {
+  background: linear-gradient(135deg, #c2410c 0%, #92400e 50%, #b45309 100%);
+}
+
+/* Warm progress bar */
+.earth-progress-track {
+  background-color: #f3ece1;
+  border-radius: 9999px;
+  overflow: hidden;
+  height: 6px;
+}
+
+.earth-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Table warm alternating rows */
+.earth-table-row-even {
+  background-color: rgba(243, 236, 225, 0.4);
+}
+
+/* Terracotta button */
+.earth-btn-primary {
+  background-color: #c2410c;
+  color: white;
+  border-radius: 9999px;
+  padding: 12px 32px;
+  font-weight: 500;
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: none;
+  cursor: pointer;
+}
+
+.earth-btn-primary:hover {
+  background-color: #a83509;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px -4px rgba(194, 65, 12, 0.3);
+}
+
+/* Outline button warm */
+.earth-btn-outline {
+  background-color: transparent;
+  color: #292018;
+  border: 1.5px solid #e2d5c3;
+  border-radius: 9999px;
+  padding: 12px 32px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.earth-btn-outline:hover {
+  border-color: #c2410c;
+  color: #c2410c;
+  background-color: rgba(194, 65, 12, 0.04);
+}
+
+/* Animated entry */
+@keyframes earth-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.earth-fade-up {
+  animation: earth-fade-up 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.earth-fade-up-delay-1 {
+  animation-delay: 0.1s;
+}
+
+.earth-fade-up-delay-2 {
+  animation-delay: 0.2s;
+}
+
+.earth-fade-up-delay-3 {
+  animation-delay: 0.3s;
+}
+
+.earth-fade-up-delay-4 {
+  animation-delay: 0.4s;
 }

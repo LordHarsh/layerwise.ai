@@ -9,9 +9,11 @@ import { Progress } from "@/components/ui/progress";
 interface UploadZoneProps {
   onUploadComplete: (url: string, filename: string) => void;
   disabled?: boolean;
+  userId?: string;
+  projectId?: string;
 }
 
-export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
+export function UploadZone({ onUploadComplete, disabled, userId, projectId }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -49,8 +51,10 @@ export function UploadZone({ onUploadComplete, disabled }: UploadZoneProps) {
     setError(null);
 
     try {
-      const ext = file.name.split(".").pop() || "pdf";
-      const blobPath = `blueprints/${crypto.randomUUID()}.${ext}`;
+      const prefix = userId && projectId
+        ? `${userId}/${projectId}`
+        : `uploads/${crypto.randomUUID()}`;
+      const blobPath = `${prefix}/${file.name}`;
 
       const blob = await upload(blobPath, file, {
         access: "public",
