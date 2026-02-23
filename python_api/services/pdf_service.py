@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import io
-from typing import TYPE_CHECKING, TypedDict
+from typing import TypedDict
 
 import httpx
-
-if TYPE_CHECKING:
-    from pydantic_ai.messages import BinaryContent
+from google.genai import types
 
 
 class FileInfo(TypedDict):
@@ -90,20 +88,18 @@ class FileService:
         return images
 
     @staticmethod
-    def to_content_parts(data: bytes) -> list[BinaryContent]:
-        """Convert file bytes to content parts for the AI agent.
+    def to_content_parts(data: bytes) -> list[types.Part]:
+        """Convert file bytes to content parts for the Gemini API.
 
-        PDFs are converted to images since Gemini's OpenAI-compat endpoint
-        doesn't support the 'file' content type. Images pass through as-is.
+        PDFs are converted to images since vision models work with images.
+        Images pass through as-is.
         """
-        from pydantic_ai.messages import BinaryContent
-
         if FileService.is_pdf(data):
             page_images = FileService.pdf_to_images(data)
             return [
-                BinaryContent(data=img, media_type="image/png")
+                types.Part.from_bytes(data=img, mime_type="image/png")
                 for img in page_images
             ]
         else:
             mime_type = FileService.get_mime_type(data)
-            return [BinaryContent(data=data, media_type=mime_type)]
+            return [types.Part.from_bytes(data=data, mime_type=mime_type)]

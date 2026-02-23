@@ -15,7 +15,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables
+# Load environment variables (.env.local takes priority over .env)
+load_dotenv(".env.local", override=True)
 load_dotenv()
 
 
