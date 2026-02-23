@@ -7,3 +7,4 @@ export { DocIntelligenceCard } from "./doc-intelligence-card";
 export { SpaceList } from "./space-list";
 export { TradeButtons } from "./trade-buttons";
 export { GroupedResultsTable } from "./grouped-results-table";
+export { PastUploads } from "./past-uploads";

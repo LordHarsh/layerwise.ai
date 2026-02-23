@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { UserButton, useAuth } from "@clerk/nextjs";
 import {
   Layers,
@@ -24,13 +25,23 @@ import {
   SpaceList,
   TradeButtons,
   GroupedResultsTable,
+  PastUploads,
 } from "@/components/takeoff";
 import { usePipelineStream } from "@/hooks/use-pipeline-stream";
 import { useTradeDeepDive } from "@/hooks/use-trade-deepdive";
 import type { TradeAnalysis } from "@/types";
 
 export default function TakeoffPage() {
+  return (
+    <Suspense>
+      <TakeoffPageContent />
+    </Suspense>
+  );
+}
+
+function TakeoffPageContent() {
   const { userId } = useAuth();
+  const searchParams = useSearchParams();
   const [projectId, setProjectId] = useState(() => crypto.randomUUID());
   const [blueprintUrl, setBlueprintUrl] = useState<string | null>(null);
   const [blueprintName, setBlueprintName] = useState<string | null>(null);
@@ -38,6 +49,22 @@ export default function TakeoffPage() {
 
   const pipeline = usePipelineStream();
   const tradeDeepDive = useTradeDeepDive();
+
+  // Pre-populate from ?url= query param (e.g. from dashboard links)
+  useEffect(() => {
+    const urlParam = searchParams.get("url");
+    if (urlParam && !blueprintUrl) {
+      setBlueprintUrl(urlParam);
+      // Extract filename from URL
+      try {
+        const pathname = new URL(urlParam).pathname;
+        const filename = decodeURIComponent(pathname.split("/").pop() || "blueprint");
+        setBlueprintName(filename);
+      } catch {
+        setBlueprintName("blueprint");
+      }
+    }
+  }, [searchParams, blueprintUrl]);
 
   const handleUploadComplete = useCallback((url: string, filename: string) => {
     setBlueprintUrl(url);
@@ -208,6 +235,15 @@ export default function TakeoffPage() {
                 userId={userId || undefined}
                 projectId={projectId}
               />
+              {!blueprintUrl && !isAnalyzing && (
+                <div className="mt-3 border-t border-[#e2d5c3] pt-3">
+                  <PastUploads
+                    onSelect={handleUploadComplete}
+                    disabled={isAnalyzing}
+                    currentUrl={blueprintUrl}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Scale */}
