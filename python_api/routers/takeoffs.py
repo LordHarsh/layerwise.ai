@@ -38,6 +38,26 @@ class TradeDeepDiveRequest(BaseModel):
     scale: str | None = Field(default=None, description="Scale override")
 
 
+class DocIntelligenceRequest(BaseModel):
+    """Request body for the document intelligence endpoint."""
+    blueprint_url: str = Field(description="URL of the blueprint PDF/image")
+
+
+class DetectSpacesRequest(BaseModel):
+    """Request body for the space detection endpoint."""
+    blueprint_url: str = Field(description="URL of the blueprint PDF/image")
+    doc_type: str | None = Field(default=None, description="Document type from Phase 1")
+    scale: str | None = Field(default=None, description="Scale override")
+
+
+class RoomTakeoffRequest(BaseModel):
+    """Request body for single-room takeoff endpoint."""
+    blueprint_url: str = Field(description="URL of the blueprint PDF/image")
+    space_name: str = Field(description="Name of the room/space to analyze")
+    space_type: str = Field(description="Type of space: room, corridor, exterior, utility, other")
+    scale: str | None = Field(default=None, description="Scale override")
+
+
 # ── Existing endpoints (backward compat) ──
 
 
@@ -161,10 +181,86 @@ async def detect_blueprint_scale(
         raise HTTPException(status_code=500, detail="Scale detection failed. Please try again.")
 
 
-# ── New pipeline endpoints ──
+# ── New pipeline endpoints (JSON, no SSE) ──
 
 
 AVAILABLE_TRADES = ["electrical", "plumbing", "hvac", "structural", "finishes"]
+
+
+@router.post("/doc-intelligence")
+async def doc_intelligence(request: DocIntelligenceRequest) -> dict:
+    """Phase 1: Analyze document to extract type, scale, room estimate, complexity."""
+    try:
+        file_bytes = await FileService.fetch_file(request.blueprint_url)
+        file_info = FileService.get_file_info(file_bytes)
+        content_parts = FileService.to_content_parts(file_bytes)
+
+        doc_info = await analyze_document(
+            content_parts=content_parts,
+            page_count=file_info["page_count"],
+        )
+
+        return doc_info.model_dump()
+
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error fetching blueprint: {e}")
+        raise HTTPException(status_code=400, detail="Failed to fetch blueprint")
+    except Exception as e:
+        logger.exception("Document intelligence failed")
+        raise HTTPException(status_code=500, detail="Document intelligence failed. Please try again.")
+
+
+@router.post("/detect-spaces")
+async def detect_spaces_endpoint(request: DetectSpacesRequest) -> dict:
+    """Phase 2: Detect all rooms/spaces in the blueprint."""
+    try:
+        file_bytes = await FileService.fetch_file(request.blueprint_url)
+        content_parts = FileService.to_content_parts(file_bytes)
+
+        space_result = await detect_spaces(
+            content_parts=content_parts,
+            doc_type=request.doc_type,
+            scale=request.scale,
+        )
+
+        return space_result.model_dump()
+
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error fetching blueprint: {e}")
+        raise HTTPException(status_code=400, detail="Failed to fetch blueprint")
+    except Exception as e:
+        logger.exception("Space detection failed")
+        raise HTTPException(status_code=500, detail="Space detection failed. Please try again.")
+
+
+@router.post("/room-takeoff")
+async def room_takeoff(request: RoomTakeoffRequest) -> dict:
+    """Phase 3: Extract takeoff items for a single room/space."""
+    try:
+        file_bytes = await FileService.fetch_file(request.blueprint_url)
+        content_parts = FileService.to_content_parts(file_bytes)
+
+        items = await run_room_takeoff(
+            content_parts=content_parts,
+            space_name=request.space_name,
+            space_type=request.space_type,
+            scale=request.scale,
+        )
+
+        return {
+            "space_name": request.space_name,
+            "items": [item.model_dump() for item in items],
+        }
+
+    except httpx.HTTPError as e:
+        logger.error(f"HTTP error fetching blueprint: {e}")
+        raise HTTPException(status_code=400, detail="Failed to fetch blueprint")
+    except Exception as e:
+        logger.exception(f"Room takeoff failed for {request.space_name}")
+        raise HTTPException(status_code=500, detail=f"Room takeoff failed for {request.space_name}. Please try again.")
+
+
+# ── Legacy SSE pipeline endpoint ──
 
 
 @router.post("/stream-pipeline")

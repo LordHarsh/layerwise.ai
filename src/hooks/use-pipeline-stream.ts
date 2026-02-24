@@ -6,7 +6,6 @@ import type {
   DocumentIntelligence,
   Space,
   RoomTakeoff,
-  RoomItemsEvent,
   PipelineCompleteEvent,
 } from "@/types";
 
@@ -35,6 +34,14 @@ interface UsePipelineStreamOptions {
   apiUrl?: string;
 }
 
+const AVAILABLE_TRADES = [
+  "electrical",
+  "plumbing",
+  "hvac",
+  "structural",
+  "finishes",
+];
+
 export function usePipelineStream(options: UsePipelineStreamOptions = {}) {
   const defaultApiUrl =
     typeof window !== "undefined" && window.location.hostname === "localhost"
@@ -56,86 +63,32 @@ export function usePipelineStream(options: UsePipelineStreamOptions = {}) {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const handleEvent = useCallback((eventType: string, data: unknown) => {
-    const d = data as Record<string, unknown>;
+  /** Build the full URL for a pipeline endpoint. */
+  const endpoint = useCallback(
+    (path: string) =>
+      apiUrl ? `${apiUrl}/takeoff/${path}` : `/python/takeoff/${path}`,
+    [apiUrl]
+  );
 
-    switch (eventType) {
-      case "phase_start": {
-        const phase = d.phase as number;
-        const statusMap: Record<number, PipelineStatus> = {
-          1: "phase-1",
-          2: "phase-2",
-          3: "phase-3",
-        };
-        setState((prev) => ({
-          ...prev,
-          status: statusMap[phase] || prev.status,
-        }));
-        break;
+  /** POST JSON and return parsed response. Throws on HTTP or network errors. */
+  const postJson = useCallback(
+    async <T>(path: string, body: Record<string, unknown>): Promise<T> => {
+      const res = await fetch(endpoint(path), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: abortControllerRef.current?.signal,
+      });
+
+      if (!res.ok) {
+        const detail = await res.text().catch(() => res.statusText);
+        throw new Error(`${path} failed (${res.status}): ${detail}`);
       }
 
-      case "doc_intelligence":
-        setState((prev) => ({
-          ...prev,
-          docIntelligence: d as unknown as DocumentIntelligence,
-        }));
-        break;
-
-      case "spaces":
-        setState((prev) => ({
-          ...prev,
-          spaces: (d.spaces as Space[]) || [],
-        }));
-        break;
-
-      case "room_start":
-        setState((prev) => ({
-          ...prev,
-          currentRoom: d.space_id as string,
-        }));
-        break;
-
-      case "room_items": {
-        const evt = d as unknown as RoomItemsEvent;
-        setState((prev) => {
-          const newMap = new Map(prev.roomResults);
-          newMap.set(evt.space_id, {
-            space_id: evt.space_id,
-            space_name: evt.space_name,
-            items: evt.items || [],
-            notes: [],
-          });
-          const newAllItems = [...prev.allItems, ...(evt.items || [])];
-          return {
-            ...prev,
-            roomResults: newMap,
-            allItems: newAllItems,
-            currentRoom: null,
-          };
-        });
-        break;
-      }
-
-      case "complete": {
-        const complete = d as unknown as PipelineCompleteEvent;
-        setState((prev) => ({
-          ...prev,
-          status: "complete",
-          summary: complete,
-          availableTrades: complete.available_trades || [],
-        }));
-        break;
-      }
-
-      case "error":
-        setState((prev) => ({
-          ...prev,
-          status: "error",
-          error: (d.message as string) || "Unknown error",
-        }));
-        break;
-    }
-  }, []);
+      return res.json() as Promise<T>;
+    },
+    [endpoint]
+  );
 
   const startPipeline = useCallback(
     async (blueprintUrl: string, scale?: string) => {
@@ -158,70 +111,109 @@ export function usePipelineStream(options: UsePipelineStreamOptions = {}) {
       });
 
       try {
-        const endpoint = apiUrl
-          ? `${apiUrl}/takeoff/stream-pipeline`
-          : "/python/takeoff/stream-pipeline";
+        // ── Phase 1: Document Intelligence ──
+        setState((prev) => ({ ...prev, status: "phase-1" }));
 
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const docIntelligence = await postJson<DocumentIntelligence>(
+          "doc-intelligence",
+          { blueprint_url: blueprintUrl }
+        );
+
+        // Determine scale: manual override > detected > null
+        const resolvedScale =
+          scale || docIntelligence.scale?.scale_string || null;
+
+        setState((prev) => ({ ...prev, docIntelligence }));
+
+        // ── Phase 2: Space Detection ──
+        setState((prev) => ({ ...prev, status: "phase-2" }));
+
+        const spaceResult = await postJson<{ spaces: Space[]; total_area_estimate?: number | null; floor_count: number }>(
+          "detect-spaces",
+          {
             blueprint_url: blueprintUrl,
-            scale: scale || null,
-          }),
-          signal: abortControllerRef.current.signal,
-        });
+            doc_type: docIntelligence.doc_type,
+            scale: resolvedScale,
+          }
+        );
 
-        if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`);
-        }
+        setState((prev) => ({ ...prev, spaces: spaceResult.spaces }));
 
-        if (!response.body) {
-          throw new Error("No response body");
-        }
+        // ── Phase 3: Room-by-Room Extraction ──
+        setState((prev) => ({ ...prev, status: "phase-3" }));
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
+        const allItems: TakeoffItem[] = [];
+        const roomResults = new Map<string, RoomTakeoff>();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        for (const space of spaceResult.spaces) {
+          setState((prev) => ({ ...prev, currentRoom: space.id }));
 
-          buffer += decoder.decode(value, { stream: true });
+          try {
+            const result = await postJson<{
+              space_name: string;
+              items: TakeoffItem[];
+            }>("room-takeoff", {
+              blueprint_url: blueprintUrl,
+              space_name: space.name,
+              space_type: space.type,
+              scale: resolvedScale,
+            });
 
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+            const items = result.items || [];
+            allItems.push(...items);
 
-          let eventType = "";
-          let eventData = "";
+            roomResults.set(space.id, {
+              space_id: space.id,
+              space_name: space.name,
+              items,
+              notes: [],
+            });
 
-          for (const line of lines) {
-            if (line.startsWith("event: ")) {
-              eventType = line.slice(7).trim();
-            } else if (line.startsWith("data: ")) {
-              eventData = line.slice(6);
+            setState((prev) => ({
+              ...prev,
+              roomResults: new Map(roomResults),
+              allItems: [...allItems],
+              currentRoom: null,
+            }));
+          } catch (roomErr) {
+            // Log but don't abort the whole pipeline for one room failure
+            console.warn(`Room takeoff failed for ${space.name}:`, roomErr);
 
-              if (eventType && eventData) {
-                try {
-                  const parsed = JSON.parse(eventData);
-                  handleEvent(eventType, parsed);
-                } catch {
-                  // Skip malformed JSON
-                }
-                eventType = "";
-                eventData = "";
-              }
-            }
+            roomResults.set(space.id, {
+              space_id: space.id,
+              space_name: space.name,
+              items: [],
+              notes: [],
+            });
+
+            setState((prev) => ({
+              ...prev,
+              roomResults: new Map(roomResults),
+              currentRoom: null,
+            }));
           }
         }
 
-        // If stream ended without a complete event, mark as complete
-        setState((prev) =>
-          prev.status !== "error" && prev.status !== "complete"
-            ? { ...prev, status: "complete" }
-            : prev
-        );
+        // ── Build summary ──
+        const summary: Record<string, number> = {};
+        for (const item of allItems) {
+          const key = `total_${item.category}`;
+          summary[key] = (summary[key] || 0) + item.quantity;
+        }
+
+        const completeEvent: PipelineCompleteEvent = {
+          total_items: allItems.length,
+          summary,
+          scale_used: resolvedScale,
+          available_trades: AVAILABLE_TRADES,
+        };
+
+        setState((prev) => ({
+          ...prev,
+          status: "complete",
+          summary: completeEvent,
+          availableTrades: AVAILABLE_TRADES,
+        }));
       } catch (error) {
         if ((error as Error).name === "AbortError") {
           setState((prev) => ({ ...prev, status: "idle" }));
@@ -235,7 +227,7 @@ export function usePipelineStream(options: UsePipelineStreamOptions = {}) {
         }));
       }
     },
-    [apiUrl, handleEvent]
+    [postJson]
   );
 
   const cancel = useCallback(() => {
