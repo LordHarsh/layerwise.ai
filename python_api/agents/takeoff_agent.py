@@ -77,6 +77,13 @@ Focus ONLY on the room/space specified in the prompt. Do not include items from 
 5. Note any special features (built-ins, niches, soffits)
 6. Use the provided scale for accurate measurements
 
+## Page Number & Bounding Box
+
+- Each image is labeled with `[Page N]` before it. Set `page_number` to the page the item appears on.
+- For each item, provide a `bbox` as [y_min, x_min, y_max, x_max] in a 0–1000 coordinate system where (0,0) is the top-left and (1000,1000) is the bottom-right of the page image.
+- The bbox should approximately enclose the item or the area it occupies on the drawing. It does not need to be pixel-perfect.
+- If you cannot determine a bounding box, set `bbox` to null.
+
 ## Output Requirements
 
 - Be exhaustive within the target room
@@ -126,6 +133,7 @@ async def run_room_takeoff(
     space_name: str,
     space_type: str,
     scale: str | None = None,
+    page_count: int = 1,
 ) -> list[TakeoffItem]:
     """Run takeoff extraction for a single room/space.
 
@@ -139,6 +147,8 @@ async def run_room_takeoff(
     prompt_parts = [
         f'Extract all measurable items from the room/space named "{space_name}" (type: {space_type}).',
         "Focus ONLY on this specific space. Do not include items from other rooms.",
+        f"\nThis document has {page_count} page(s). Each page image is labeled with [Page N].",
+        "Set page_number and bbox for every item you extract.",
     ]
 
     if scale:
@@ -151,9 +161,21 @@ async def run_room_takeoff(
 
     prompt = "\n".join(prompt_parts)
 
+    # Interleave [Page N] text labels before each image part so the model
+    # knows which page each image belongs to.
+    labeled_parts: list[types.Part] = []
+    page_idx = 1
+    for part in content_parts:
+        if hasattr(part, "inline_data") and part.inline_data is not None:
+            labeled_parts.append(types.Part(text=f"[Page {page_idx}]"))
+            labeled_parts.append(part)
+            page_idx += 1
+        else:
+            labeled_parts.append(part)
+
     response = await get_client().aio.models.generate_content(
         model="gemini-2.0-flash",
-        contents=[prompt, *content_parts],
+        contents=[prompt, *labeled_parts],
         config=types.GenerateContentConfig(
             system_instruction=ROOM_TAKEOFF_INSTRUCTIONS,
             response_mime_type="application/json",

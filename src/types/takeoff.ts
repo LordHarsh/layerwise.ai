@@ -12,6 +12,8 @@ export interface TakeoffItem {
   location?: string | null;
   notes?: string | null;
   confidence: number;
+  page_number: number;
+  bbox?: [number, number, number, number] | null;
 }
 
 export interface TakeoffResult {

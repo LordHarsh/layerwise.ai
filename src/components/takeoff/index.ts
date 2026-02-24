@@ -8,3 +8,4 @@ export { SpaceList } from "./space-list";
 export { TradeButtons } from "./trade-buttons";
 export { GroupedResultsTable } from "./grouped-results-table";
 export { PastUploads } from "./past-uploads";
+// BlueprintViewer is dynamically imported (ssr: false) due to pdfjs browser deps

@@ -24,6 +24,8 @@ class TakeoffItem(BaseModel):
         default=0.8,
         description="Confidence score of the measurement (0-1)"
     )
+    page_number: int = Field(default=1, ge=1, description="1-indexed PDF page number where this item was found")
+    bbox: list[int] | None = Field(default=None, description="Bounding box [y_min, x_min, y_max, x_max] in 0-1000 normalized coords")
 
     class Config:
         json_schema_extra = {
@@ -34,7 +36,9 @@ class TakeoffItem(BaseModel):
                 "unit": "ea",
                 "location": "Floor 1",
                 "notes": "Standard hollow core",
-                "confidence": 0.95
+                "confidence": 0.95,
+                "page_number": 1,
+                "bbox": [120, 340, 280, 560]
             }
         }
 

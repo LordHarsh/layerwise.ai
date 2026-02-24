@@ -157,6 +157,7 @@ export function usePipelineStream(options: UsePipelineStreamOptions = {}) {
               space_name: space.name,
               space_type: space.type,
               scale: resolvedScale,
+              page_count: docIntelligence.page_count,
             });
 
             const items = result.items || [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +26,10 @@ interface GroupedResultsTableProps {
   tradeResults: Map<string, TradeAnalysis>;
   isStreaming: boolean;
   currentRoom: string | null;
+  /** Index of the selected item in the flattened allItems list */
+  selectedItemIndex?: number | null;
+  /** Callback when a row is clicked */
+  onItemSelect?: (index: number) => void;
 }
 
 export function GroupedResultsTable({
@@ -33,11 +37,25 @@ export function GroupedResultsTable({
   tradeResults,
   isStreaming,
   currentRoom,
+  selectedItemIndex,
+  onItemSelect,
 }: GroupedResultsTableProps) {
   const totalItems = useMemo(() => {
     let count = 0;
     roomResults.forEach((r) => (count += r.items.length));
     return count;
+  }, [roomResults]);
+
+  // Compute the starting flat index for each room so we can map
+  // row clicks to the global allItems index.
+  const roomOffsets = useMemo(() => {
+    const offsets = new Map<string, number>();
+    let offset = 0;
+    roomResults.forEach((room) => {
+      offsets.set(room.space_id, offset);
+      offset += room.items.length;
+    });
+    return offsets;
   }, [roomResults]);
 
   if (totalItems === 0 && !isStreaming) {
@@ -62,6 +80,9 @@ export function GroupedResultsTable({
           key={room.space_id}
           room={room}
           isActive={currentRoom === room.space_id}
+          baseIndex={roomOffsets.get(room.space_id) ?? 0}
+          selectedItemIndex={selectedItemIndex ?? null}
+          onItemSelect={onItemSelect}
         />
       ))}
 
@@ -116,16 +137,34 @@ function SummaryCounts({
 function RoomSection({
   room,
   isActive,
+  baseIndex,
+  selectedItemIndex,
+  onItemSelect,
 }: {
   room: RoomTakeoff;
   isActive: boolean;
+  baseIndex: number;
+  selectedItemIndex: number | null;
+  onItemSelect?: (index: number) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  // Auto-expand and scroll into view when a selected item is in this room
+  useEffect(() => {
+    if (selectedItemIndex === null) return;
+    const localIdx = selectedItemIndex - baseIndex;
+    if (localIdx >= 0 && localIdx < room.items.length) {
+      setExpanded(true);
+      sectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [selectedItemIndex, baseIndex, room.items.length]);
 
   if (room.items.length === 0) return null;
 
   return (
     <div
+      ref={sectionRef}
       className={`overflow-hidden rounded-xl border ${
         isActive ? "border-[#c2410c]/30 bg-[rgba(194,65,12,0.02)]" : "border-[#e2d5c3]"
       }`}
@@ -151,7 +190,12 @@ function RoomSection({
       {/* Items table */}
       {expanded && (
         <div className="border-t border-[#e2d5c3]">
-          <ItemsTable items={room.items} />
+          <ItemsTable
+            items={room.items}
+            baseIndex={baseIndex}
+            selectedItemIndex={selectedItemIndex}
+            onItemSelect={onItemSelect}
+          />
         </div>
       )}
     </div>
@@ -236,16 +280,37 @@ function TradeSection({ analysis }: { analysis: TradeAnalysis }) {
   );
 }
 
-function ItemsTable({ items }: { items: TakeoffItem[] }) {
-  const sorted = useMemo(() => {
-    return [...items].sort((a, b) => {
-      const order: MeasurementCategory[] = ["count", "linear", "area", "volume"];
-      if (a.category !== b.category) {
-        return order.indexOf(a.category) - order.indexOf(b.category);
-      }
-      return a.name.localeCompare(b.name);
-    });
-  }, [items]);
+function ItemsTable({
+  items,
+  baseIndex = 0,
+  selectedItemIndex,
+  onItemSelect,
+}: {
+  items: TakeoffItem[];
+  baseIndex?: number;
+  selectedItemIndex?: number | null;
+  onItemSelect?: (index: number) => void;
+}) {
+  const selectedRowRef = useRef<HTMLTableRowElement>(null);
+
+  // Auto-scroll selected row into view
+  useEffect(() => {
+    if (selectedItemIndex === null || selectedItemIndex === undefined) return;
+    selectedRowRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [selectedItemIndex]);
+
+  // We keep original indices for selection mapping — sort creates index mapping
+  const sortedWithIdx = useMemo(() => {
+    return items
+      .map((item, localIdx) => ({ item, globalIdx: baseIndex + localIdx }))
+      .sort((a, b) => {
+        const order: MeasurementCategory[] = ["count", "linear", "area", "volume"];
+        if (a.item.category !== b.item.category) {
+          return order.indexOf(a.item.category) - order.indexOf(b.item.category);
+        }
+        return a.item.name.localeCompare(b.item.name);
+      });
+  }, [items, baseIndex]);
 
   return (
     <Table>
@@ -254,36 +319,54 @@ function ItemsTable({ items }: { items: TakeoffItem[] }) {
           <TableHead className="w-[40%] py-2 text-xs">Item</TableHead>
           <TableHead className="py-2 text-xs">Type</TableHead>
           <TableHead className="py-2 text-right text-xs">Qty</TableHead>
+          <TableHead className="hidden py-2 text-center text-xs sm:table-cell">
+            Pg
+          </TableHead>
           <TableHead className="hidden py-2 text-right text-xs sm:table-cell">
             Confidence
           </TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {sorted.map((item, idx) => (
-          <TableRow key={`${item.name}-${idx}`} className={idx % 2 === 0 ? "earth-table-row-even" : ""}>
-            <TableCell className="py-1.5">
-              <p className="text-xs font-medium">{item.name}</p>
-              {item.notes && (
-                <p className="text-[10px] text-[#a8a29e]">{item.notes}</p>
-              )}
-            </TableCell>
-            <TableCell className="py-1.5">
-              <Badge variant="secondary" className={`text-[10px] ${categoryConfig[item.category].className}`}>
-                {categoryConfig[item.category].label}
-              </Badge>
-            </TableCell>
-            <TableCell className="py-1.5 text-right">
-              <span className="font-mono text-xs tabular-nums">
-                {item.quantity.toLocaleString()}
-              </span>
-              <span className="ml-1 text-[10px] text-[#a8a29e]">{item.unit}</span>
-            </TableCell>
-            <TableCell className="hidden py-1.5 text-right sm:table-cell">
-              <ConfidenceDot value={item.confidence} />
-            </TableCell>
-          </TableRow>
-        ))}
+        {sortedWithIdx.map(({ item, globalIdx }, idx) => {
+          const isSelected = selectedItemIndex === globalIdx;
+          return (
+            <TableRow
+              key={`${item.name}-${globalIdx}`}
+              ref={isSelected ? selectedRowRef : undefined}
+              className={`${idx % 2 === 0 ? "earth-table-row-even" : ""} ${
+                isSelected ? "!bg-[rgba(194,65,12,0.08)]" : ""
+              } ${onItemSelect ? "cursor-pointer" : ""}`}
+              onClick={onItemSelect ? () => onItemSelect(globalIdx) : undefined}
+            >
+              <TableCell className="py-1.5">
+                <p className="text-xs font-medium">{item.name}</p>
+                {item.notes && (
+                  <p className="text-[10px] text-[#a8a29e]">{item.notes}</p>
+                )}
+              </TableCell>
+              <TableCell className="py-1.5">
+                <Badge variant="secondary" className={`text-[10px] ${categoryConfig[item.category].className}`}>
+                  {categoryConfig[item.category].label}
+                </Badge>
+              </TableCell>
+              <TableCell className="py-1.5 text-right">
+                <span className="font-mono text-xs tabular-nums">
+                  {item.quantity.toLocaleString()}
+                </span>
+                <span className="ml-1 text-[10px] text-[#a8a29e]">{item.unit}</span>
+              </TableCell>
+              <TableCell className="hidden py-1.5 text-center sm:table-cell">
+                <Badge variant="outline" className="text-[10px] tabular-nums">
+                  {item.page_number}
+                </Badge>
+              </TableCell>
+              <TableCell className="hidden py-1.5 text-right sm:table-cell">
+                <ConfidenceDot value={item.confidence} />
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

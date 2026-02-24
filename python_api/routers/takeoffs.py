@@ -56,6 +56,7 @@ class RoomTakeoffRequest(BaseModel):
     space_name: str = Field(description="Name of the room/space to analyze")
     space_type: str = Field(description="Type of space: room, corridor, exterior, utility, other")
     scale: str | None = Field(default=None, description="Scale override")
+    page_count: int = Field(default=1, ge=1, description="Number of pages in the document")
 
 
 # ── Existing endpoints (backward compat) ──
@@ -245,6 +246,7 @@ async def room_takeoff(request: RoomTakeoffRequest) -> dict:
             space_name=request.space_name,
             space_type=request.space_type,
             scale=request.scale,
+            page_count=request.page_count,
         )
 
         return {
@@ -348,6 +350,7 @@ async def stream_pipeline(request: PipelineRequest):
                         space_name=space.name,
                         space_type=space.type.value,
                         scale=scale,
+                        page_count=file_info["page_count"],
                     )
                     all_items.extend(items)
 

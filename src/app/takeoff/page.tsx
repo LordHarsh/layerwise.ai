@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { UserButton, useAuth } from "@clerk/nextjs";
@@ -12,6 +13,7 @@ import {
   FileSearch,
   Loader2,
   ChevronRight,
+  Map,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,11 @@ import {
   GroupedResultsTable,
   PastUploads,
 } from "@/components/takeoff";
+
+const BlueprintViewer = dynamic(
+  () => import("@/components/takeoff/blueprint-viewer").then((m) => m.BlueprintViewer),
+  { ssr: false }
+);
 import { usePipelineStream } from "@/hooks/use-pipeline-stream";
 import { useTradeDeepDive } from "@/hooks/use-trade-deepdive";
 import type { TradeAnalysis } from "@/types";
@@ -46,6 +53,8 @@ function TakeoffPageContent() {
   const [blueprintUrl, setBlueprintUrl] = useState<string | null>(null);
   const [blueprintName, setBlueprintName] = useState<string | null>(null);
   const [scale, setScale] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"results" | "blueprint">("results");
+  const [selectedItemIndex, setSelectedItemIndex] = useState<number | null>(null);
 
   const pipeline = usePipelineStream();
   const tradeDeepDive = useTradeDeepDive();
@@ -82,6 +91,8 @@ function TakeoffPageContent() {
     setBlueprintUrl(null);
     setBlueprintName(null);
     setScale("");
+    setActiveTab("results");
+    setSelectedItemIndex(null);
     setProjectId(crypto.randomUUID());
   }, [pipeline, tradeDeepDive]);
 
@@ -115,13 +126,13 @@ function TakeoffPageContent() {
 
   // Build trade results map for the grouped table
   const tradeResultsMap = useMemo(() => {
-    const map = new Map<string, TradeAnalysis>();
+    const entries: [string, TradeAnalysis][] = [];
     tradeDeepDive.results.forEach((state, trade) => {
       if (state.result) {
-        map.set(trade, state.result);
+        entries.push([trade, state.result]);
       }
     });
-    return map;
+    return new globalThis.Map(entries);
   }, [tradeDeepDive.results]);
 
   const handleExportCSV = useCallback(() => {
@@ -135,7 +146,7 @@ function TakeoffPageContent() {
 
     if (allItems.length === 0) return;
 
-    const headers = ["Name", "Category", "Quantity", "Unit", "Location", "Confidence"];
+    const headers = ["Name", "Category", "Quantity", "Unit", "Location", "Confidence", "Page", "BBox"];
     const rows = allItems.map((item) => [
       `"${item.name.replace(/"/g, '""')}"`,
       item.category,
@@ -143,6 +154,8 @@ function TakeoffPageContent() {
       item.unit,
       item.location || "",
       (item.confidence * 100).toFixed(0) + "%",
+      item.page_number.toString(),
+      item.bbox ? `"${item.bbox.join(",")}"` : "",
     ]);
 
     const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
@@ -367,15 +380,19 @@ function TakeoffPageContent() {
           {/* ── Right Panel ── */}
           <div className="space-y-5">
             <div className="earth-shadow earth-fade-up earth-fade-up-delay-1 overflow-hidden rounded-2xl border border-[#e2d5c3] bg-white">
-              {/* Results Header */}
+              {/* Header with tabs */}
               <div className="flex items-center justify-between border-b border-[#e2d5c3] px-6 py-5">
                 <div className="flex items-center gap-3">
                   <div className="flex size-9 items-center justify-center rounded-lg bg-[#f3ece1]">
-                    <FileSearch className="size-5 text-[#78716c]" />
+                    {activeTab === "results" ? (
+                      <FileSearch className="size-5 text-[#78716c]" />
+                    ) : (
+                      <Map className="size-5 text-[#78716c]" />
+                    )}
                   </div>
                   <div>
                     <h2 className="earth-serif text-lg font-semibold text-[#292018]">
-                      Results
+                      {activeTab === "results" ? "Results" : "Blueprint"}
                     </h2>
                     <p className="text-xs text-[#78716c]">
                       {blueprintName || "Upload a blueprint to begin"}
@@ -383,85 +400,142 @@ function TakeoffPageContent() {
                   </div>
                 </div>
 
-                {hasResults && pipeline.status === "complete" && (
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  {/* Tab toggle */}
+                  {(hasResults || blueprintUrl) && (
+                    <div className="flex rounded-full border border-[#e2d5c3] bg-[#faf7f2] p-0.5">
+                      <button
+                        onClick={() => setActiveTab("results")}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                          activeTab === "results"
+                            ? "bg-white text-[#292018] shadow-sm"
+                            : "text-[#78716c] hover:text-[#292018]"
+                        }`}
+                      >
+                        Results
+                      </button>
+                      <button
+                        onClick={() => setActiveTab("blueprint")}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                          activeTab === "blueprint"
+                            ? "bg-white text-[#292018] shadow-sm"
+                            : "text-[#78716c] hover:text-[#292018]"
+                        }`}
+                      >
+                        Blueprint
+                      </button>
+                    </div>
+                  )}
+
+                  {hasResults && pipeline.status === "complete" && (
                     <Badge variant="secondary" className="bg-[#f3ece1] text-xs text-[#78716c]">
                       {pipeline.allItems.length} items
                     </Badge>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
 
-              <div className="p-6">
-                {/* Error */}
-                {pipeline.error && (
-                  <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3">
-                    <div className="mt-0.5 size-2 shrink-0 rounded-full bg-red-500" />
-                    <p className="text-sm text-red-700">{pipeline.error}</p>
-                  </div>
-                )}
-
-                {/* Grouped results */}
-                <GroupedResultsTable
-                  roomResults={pipeline.roomResults}
-                  tradeResults={tradeResultsMap}
-                  isStreaming={isAnalyzing}
-                  currentRoom={pipeline.currentRoom}
-                />
-
-                {/* Summary after completion */}
-                {pipeline.summary && pipeline.status === "complete" && (
-                  <div className="mt-6">
-                    <div className="earth-divider">
-                      <div className="earth-divider-diamond" />
+              {/* Tab content */}
+              {activeTab === "results" ? (
+                <div className="p-6">
+                  {/* Error */}
+                  {pipeline.error && (
+                    <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3">
+                      <div className="mt-0.5 size-2 shrink-0 rounded-full bg-red-500" />
+                      <p className="text-sm text-red-700">{pipeline.error}</p>
                     </div>
+                  )}
+
+                  {/* Grouped results */}
+                  <GroupedResultsTable
+                    roomResults={pipeline.roomResults}
+                    tradeResults={tradeResultsMap}
+                    isStreaming={isAnalyzing}
+                    currentRoom={pipeline.currentRoom}
+                    selectedItemIndex={selectedItemIndex}
+                    onItemSelect={(idx) => {
+                      setSelectedItemIndex(idx);
+                    }}
+                  />
+
+                  {/* Summary after completion */}
+                  {pipeline.summary && pipeline.status === "complete" && (
                     <div className="mt-6">
-                      <h3 className="earth-serif mb-3 text-sm font-semibold text-[#292018]">
-                        Summary
-                      </h3>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <SummaryCard
-                          label="Total Items"
-                          value={pipeline.summary.total_items}
-                        />
-                        <SummaryCard
-                          label="Rooms Scanned"
-                          value={pipeline.roomResults.size}
-                        />
-                        {pipeline.summary.scale_used && (
+                      <div className="earth-divider">
+                        <div className="earth-divider-diamond" />
+                      </div>
+                      <div className="mt-6">
+                        <h3 className="earth-serif mb-3 text-sm font-semibold text-[#292018]">
+                          Summary
+                        </h3>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                           <SummaryCard
-                            label="Scale"
-                            value={pipeline.summary.scale_used}
-                            isText
+                            label="Total Items"
+                            value={pipeline.summary.total_items}
                           />
-                        )}
-                        {hasTradeResults && (
                           <SummaryCard
-                            label="Trade Analyses"
-                            value={tradeResultsMap.size}
+                            label="Rooms Scanned"
+                            value={pipeline.roomResults.size}
                           />
-                        )}
+                          {pipeline.summary.scale_used && (
+                            <SummaryCard
+                              label="Scale"
+                              value={pipeline.summary.scale_used}
+                              isText
+                            />
+                          )}
+                          {hasTradeResults && (
+                            <SummaryCard
+                              label="Trade Analyses"
+                              value={tradeResultsMap.size}
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Empty state */}
-                {!hasResults && !isAnalyzing && pipeline.status === "idle" && (
-                  <div className="flex flex-col items-center justify-center py-20">
-                    <div className="flex size-16 items-center justify-center rounded-2xl bg-[rgba(194,65,12,0.08)]">
-                      <FileSearch className="size-7 text-[#c2410c]" />
+                  {/* Empty state */}
+                  {!hasResults && !isAnalyzing && pipeline.status === "idle" && (
+                    <div className="flex flex-col items-center justify-center py-20">
+                      <div className="flex size-16 items-center justify-center rounded-2xl bg-[rgba(194,65,12,0.08)]">
+                        <FileSearch className="size-7 text-[#c2410c]" />
+                      </div>
+                      <p className="earth-serif mt-4 text-lg italic text-[#78716c]">
+                        No results yet
+                      </p>
+                      <p className="mt-1.5 max-w-xs text-center text-sm text-[#a8a29e]">
+                        Upload a blueprint, set the scale, and click &quot;Start
+                        Takeoff&quot; to run the multi-phase analysis pipeline.
+                      </p>
                     </div>
-                    <p className="earth-serif mt-4 text-lg italic text-[#78716c]">
-                      No results yet
-                    </p>
-                    <p className="mt-1.5 max-w-xs text-center text-sm text-[#a8a29e]">
-                      Upload a blueprint, set the scale, and click &quot;Start
-                      Takeoff&quot; to run the multi-phase analysis pipeline.
-                    </p>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  {blueprintUrl ? (
+                    <BlueprintViewer
+                      pdfUrl={blueprintUrl}
+                      items={pipeline.allItems}
+                      selectedItemIndex={selectedItemIndex}
+                      onItemSelect={(idx) => {
+                        setSelectedItemIndex(idx);
+                        setActiveTab("results");
+                      }}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-20">
+                      <Map className="size-7 text-[#a8a29e]" />
+                      <p className="earth-serif mt-4 text-lg italic text-[#78716c]">
+                        No blueprint loaded
+                      </p>
+                      <p className="mt-1.5 text-center text-sm text-[#a8a29e]">
+                        Upload a PDF to view it here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
